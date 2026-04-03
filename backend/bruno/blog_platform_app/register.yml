@@ -1,0 +1,61 @@
+info:
+  name: register
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/api/auth/register"
+  headers:
+    - name: Content-Type
+      value: " application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{email}}",
+        "mobile" : "{{mobile}}",
+        "name" : "{{name}}",
+        "password":"{{password}}"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: email
+      value: jojolala@gmail.com
+    - name: mobile
+      value: "0999999991"
+    - name: name
+      value: Djo
+    - name: password
+      value: password@P123
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar("token", res.body.token);
+        // bru.setVar("userId", res.body.user.id);
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: body.accessToken
+        method: jsonq
+      variable:
+        name: token
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: body.user.id
+        method: jsonq
+      variable:
+        name: userId
+        scope: runtime
+      disabled: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,61 @@
+import { Request, Response, NextFunction } from "express";
+import { ZodSchema } from "zod";
+// กำหนด type ว่าจะ validate อะไรได้บ้าง
+type ValidateSchema = {
+  body?: ZodSchema; // สำหรับ req.body
+  params?: ZodSchema; // สำหรับ req.params
+  query?: ZodSchema; // สำหรับ req.query
+};
+// ฟังก์ชันหลัก (รับ schema แล้ว return middleware)
+export const useValidation =
+  (schema: ValidateSchema) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    const sections = ["body", "params", "query"] as const;
+    let errors: any[] = [];
+
+    // 🔥 1. handle multer error ก่อน
+    if (req.multerError) {
+      errors.push({
+        field: "file",
+        message: req.multerError.message,
+      });
+    }
+    if (req.file) {
+      req.body.avatar = req.file.path; // หรือ dynamic field ก็ได้
+    }
+
+    // loop เช็คทีละส่วน
+    for (const key of sections) {
+      // ดึง schema ของ section นั้น (ถ้ามี)
+      const currentSchema = schema[key];
+      // ถ้ามี schema → validate
+      if (currentSchema) {
+        const result = currentSchema.safeParse(req[key]);
+
+        // ถ้า validate ไม่ผ่าน
+        if (!result.success) {
+          const zodErrors = result.error.issues.map((e) => ({
+            field: e.path.join("."),
+            message: e.message,
+          }));
+          errors = [...errors, ...zodErrors];
+          // return res.status(400).json({
+          //   message: `${key} validation error`,
+          // });
+        } else {
+          // ถ้าผ่าน → replace req ด้วย data ที่ clean แล้ว
+          req[key] = result.data; // ✅ clean data
+        }
+
+        // 🔥 4. รวม error แล้วส่งทีเดียว
+        if (errors.length > 0) {
+          return res.status(400).json({
+            message: "Validation error",
+            errors,
+          });
+        }
+      }
+    }
+    // ผ่านทุกอย่าง → ไป controller ต่อ
+    next();
+  };

@@ -1,0 +1,67 @@
+info:
+  name: update_profile
+  type: http
+  seq: 9
+
+http:
+  method: PUT
+  url: "{{base_url}}/api/auth/profile/update"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  body:
+    type: multipart-form
+    data:
+      - name: displayName
+        type: text
+        value: Shadow2
+        contentType: text
+        disabled: true
+      - name: age
+        type: text
+        value: "12"
+        contentType: number
+        disabled: true
+      - name: linkAccounts[]
+        type: text
+        value: "youtube:https://www.youtube.com/watch?v=L051YSpEEYU&list=RDL051YSpEEYU&start_radio=1&rv=2NNPwwreJDc "
+        contentType: text
+        disabled: true
+      - name: avatar
+        type: file
+        value:
+          - C:\Users\UsEr\Downloads\656216341_122116730697235489_3497360539035603509_n.jpg
+        disabled: true
+      - name: linkAccounts[0][platform]
+        type: text
+        value: youtube
+      - name: linkAccounts[0][url]
+        type: text
+        value: https://www.youtube.com/watch?v=Ec08db2hP10&list=RDEc08db2hP10&start_radio=1
+      - name: linkAccounts[1][platform]
+        type: text
+        value: instagram
+      - name: linkAccounts[1][url]
+        type: text
+        value: https://www.instagram.com/pangboyz/
+
+runtime:
+  variables:
+    - name: displayName
+      value: ""
+      disabled: true
+    - name: bio
+      value: ""
+      disabled: true
+    - name: avatar
+      value: ""
+      disabled: true
+    - name: socialLinks
+      value: ""
+      disabled: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

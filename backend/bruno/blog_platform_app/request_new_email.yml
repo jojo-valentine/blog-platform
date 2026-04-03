@@ -1,0 +1,32 @@
+info:
+  name: request_new_email
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{base_url}}/api/auth/request-change-email"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  body:
+    type: json
+    data: |-
+      {
+        "email" : "{{email}}"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: email
+      value: jojolala731@gmail.com
+  scripts:
+    - type: after-response
+      code: bru.setVar("token", res.body.change_email_token);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,56 @@
+info:
+  name: verify-register-otp
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/api/auth/verify-register-otp"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "otp": "{{otp}}",
+        "token" :"{{token}}"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: otp
+      value: "946799"
+    - name: token
+      value: " {{token}}"
+  scripts:
+    - type: after-response
+      code: |-
+        // bru.setVar("token", res.body.accessToken);
+        // bru.setVar("userId", res.body.user.id);
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: body.accessToken
+        method: jsonq
+      variable:
+        name: token
+        scope: runtime
+      disabled: true
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: body.user.id
+        method: jsonq
+      variable:
+        name: userId
+        scope: runtime
+      disabled: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
