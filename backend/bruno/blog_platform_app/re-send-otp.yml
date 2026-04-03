@@ -6,6 +6,9 @@ info:
 http:
   method: POST
   url: "{{base_url}}/api/otp/resend-otp"
+  headers:
+    - name: Cookie
+      value: resendContactToken={{token}}
   params:
     - name: Authorization
       value: Bearer {{token}}
@@ -13,10 +16,7 @@ http:
       disabled: true
   body:
     type: json
-    data: |-
-      {
-        "token" :"{{token}}"
-      }
+    data: ""
 
 runtime:
   variables:

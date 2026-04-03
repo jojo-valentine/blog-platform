@@ -30,7 +30,7 @@ export const authMiddleware = async (
       id: string;
     };
 
-    console.log("decoded:", decoded);
+    // console.log("decoded:", decoded);
 
     // ดึง roles + permissions ของ user จาก DB
     const hasRoles = await HasRole.find({ user_id: decoded.id }).populate<{

@@ -1,11 +1,14 @@
 info:
   name: blog_post_list
   type: http
-  seq: 14
+  seq: 13
 
 http:
   method: GET
-  url: ""
+  url: "{{base_url}}/api/blog/data-list"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
   auth: inherit
 
 settings:

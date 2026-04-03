@@ -1,10 +1,10 @@
 info:
-  name: blog_post
+  name: blog_post_delete_image
   type: http
-  seq: 15
+  seq: 17
 
 http:
-  method: POST
+  method: DELETE
   url: ""
   auth: inherit
 

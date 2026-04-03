@@ -1,6 +1,6 @@
 // models/User.ts
 import { Schema, model, Document } from "mongoose";
-import { v4 as uuidv4 } from "uuid";
+// import { v4 as uuidv4 } from "uuid";
 import { IUser } from "../types/user";
 
 const UserSchema = new Schema<IUser>(

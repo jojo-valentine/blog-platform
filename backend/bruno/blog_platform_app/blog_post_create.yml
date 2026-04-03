@@ -1,0 +1,62 @@
+info:
+  name: blog_post_create
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{base_url}}/api/blog/create"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+    - name: Content-Type
+      value: multipart/form-data
+  body:
+    type: multipart-form
+    data:
+      - name: title
+        type: text
+        value: My First Blog
+        contentType: text
+      - name: content
+        type: text
+        value: This is my first blog content
+        contentType: text
+      - name: tags
+        type: text
+        value: '["travel","food"]'
+        contentType: text
+      - name: online
+        type: text
+        value: "true"
+        contentType: boolean
+      - name: coverImage
+        type: file
+        value:
+          - C:\Users\UsEr\Downloads\HDNtcVQbMAA7Mlq.jpg
+      - name: image
+        type: file
+        value:
+          - C:\Users\UsEr\Downloads\653549406_122115634533235489_2154745487496662356_n.jpg
+      - name: image
+        type: file
+        value:
+          - C:\Users\UsEr\Downloads\651925489_122115634443235489_8276176422035274395_n.jpg
+  auth: inherit
+
+runtime:
+  variables:
+    - name: title
+      value: ""
+    - name: content
+      value: ""
+    - name: tags
+      value: ""
+    - name: online
+      value: ""
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

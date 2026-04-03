@@ -1,7 +1,7 @@
 info:
   name: blog_post_toggle
   type: http
-  seq: 19
+  seq: 18
 
 http:
   method: PUT
