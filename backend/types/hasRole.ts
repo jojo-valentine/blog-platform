@@ -5,4 +5,3 @@ export interface IHasRole extends Document {
   user_id: mongoose.Types.ObjectId;
   resource: string; // เช่น "Blog", "Image", "User"
 }
-

@@ -7,10 +7,11 @@ const ImageBlogSchema = new Schema<IImageBlog>(
     blog_id: { type: Schema.Types.ObjectId, ref: "Blog" },
     // url: { type: String, required: true },
     path: { type: String, required: true },
-    image: { type: String, required: true },
+    // image: { type: String, required: true },
     caption: String,
     alt: String,
     uploadedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

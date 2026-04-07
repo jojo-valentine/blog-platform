@@ -4,9 +4,21 @@ info:
   seq: 15
 
 http:
-  method: POST
-  url: ""
+  method: GET
+  url: "{{base_url}}/api/blog/:id/edit"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  params:
+    - name: id
+      value: 69d536cac23a601590eaa352
+      type: path
   auth: inherit
+
+runtime:
+  variables:
+    - name: id
+      value: ""
 
 settings:
   encodeUrl: true

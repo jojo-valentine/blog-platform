@@ -4,8 +4,15 @@ info:
   seq: 18
 
 http:
-  method: PUT
-  url: ""
+  method: PATCH
+  url: "{{base_url}}/api/blog/:id/toggle"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  params:
+    - name: id
+      value: 69d536cac23a601590eaa352
+      type: path
   auth: inherit
 
 settings:

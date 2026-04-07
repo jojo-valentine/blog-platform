@@ -4,8 +4,63 @@ info:
   seq: 16
 
 http:
-  method: PUT
-  url: ""
+  method: PATCH
+  url: "{{base_url}}/api/blog/:id/update"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+    - name: Content-Type
+      value: multipart/form-data
+  params:
+    - name: id
+      value: 69d4f6ebcbc8b60d32ee9574
+      type: path
+  body:
+    type: multipart-form
+    data:
+      - name: title
+        type: text
+        value: ลบยัง (Re-move on) Ost.My Love Mix-Up! เขียนรักด้วยยางลบ - GEMINI, FOURTH
+        contentType: text
+        disabled: true
+      - name: content
+        type: text
+        value: |-
+          จะลบให้หายไป
+          แต่ลบเท่าไรไม่หายเลย
+          ฉันก็พูดไปงั้นแหละ
+          ไม่เคยทำมันได้เลย
+          บอกว่าจะลบ ทุกที
+
+          พูดกี่ครั้งแล้วยังไง
+          ในตอนสุดท้ายก็แบบนี้
+          เขียนเธอไว้ข้างในใจ
+          ก็ไม่มีใครรู้หนิ
+          ยิ่งลบมากแค่ไหน ยิ่งรักเธอ
+
+          ฉันจะหนีไปดาวพลูโต
+          ไปโตเกียวหรือไม่ก็โซล
+          ที่ไหนก็ได้แค่ไม่มีเธอ
+          ที่ไหนก็ได้แค่ไม่มีเธอก็พอ
+        contentType: text
+        disabled: true
+      - name: tags
+        type: text
+        value: '["travel","food","hotal"]'
+        contentType: text
+        disabled: true
+      - name: online
+        type: text
+        value: "true"
+        disabled: true
+      - name: coverImage
+        type: file
+        value:
+          - C:\Users\UsEr\Downloads\HFHBdG2bAAA_NUR.jpg
+      - name: image
+        type: text
+        value: ""
+        disabled: true
   auth: inherit
 
 settings:

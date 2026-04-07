@@ -5,7 +5,14 @@ info:
 
 http:
   method: DELETE
-  url: ""
+  url: "{{base_url}}/api/blog/:id/image"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  params:
+    - name: id
+      value: 69d536cac23a601590eaa355
+      type: path
   auth: inherit
 
 settings:

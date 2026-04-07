@@ -37,6 +37,12 @@ export const blogSchemas = {
     online: fields.online,
   }),
 
+  toggleBlog: z.object({
+    // online: fields.online,
+    // online: z.enum(["true", "false"]),
+    id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid MongoDB ObjectId"),
+  }),
+
   params: z.object({
     id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid MongoDB ObjectId"), // ✅ MongoDB ObjectId
   }),

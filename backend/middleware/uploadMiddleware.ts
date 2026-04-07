@@ -6,6 +6,8 @@ const sharp = require("sharp");
 import { Request, Response, NextFunction, response } from "express";
 import { error } from "node:console";
 import { file } from "zod";
+import { ImageBlog } from "../models";
+
 const uploadDir = path.join(__dirname, "../../update");
 const uploadDirPost = path.join(__dirname, "../../update/post");
 declare global {
@@ -19,6 +21,7 @@ declare global {
       multerError?: {
         type: "multer" | "sharp" | "unknown";
         message: string;
+        field?: string;
       };
     }
   }
@@ -40,7 +43,7 @@ const upload = multer({
     file: Express.Multer.File,
     cb: FileFilterCallback,
   ) => {
-    console.log("🔵 mimetype:", file.mimetype); // ← เพิ่มตรงนี้
+    // console.log("🔵 mimetype:", file.mimetype); // ← เพิ่มตรงนี้
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
@@ -155,16 +158,16 @@ export const uploadBlogCover = createUploadMiddleware("coverImage", (req) => {
 const MAX_BLOG_IMAGES = parseInt(process.env.MAX_BLOG_IMAGES || "5");
 
 // รูปประกอบใน blog (หลายรูป)
-export const uploadBlogImage = createUploadMultipleMiddleware(
-  "image",
-  MAX_BLOG_IMAGES,
-  (req) => {
-    const userId = req.user?.userId;
-    if (!userId) throw new Error("Unauthorized");
+// export const uploadBlogImage = createUploadMultipleMiddleware(
+//   "image",
+//   MAX_BLOG_IMAGES,
+//   (req) => {
+//     const userId = req.user?.userId;
+//     if (!userId) throw new Error("Unauthorized");
 
-    return path.join(__dirname, `../upload/${userId}/blog/images`);
-  },
-);
+//     return path.join(__dirname, `../upload/${userId}/blog/images`);
+//   },
+// );
 
 const uploadBlogFields = upload.fields([
   {
@@ -183,6 +186,7 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
     if (err) {
       req.multerError = {
         type: err instanceof multer.MulterError ? "multer" : "unknown",
+        field: err.field || "unknown", // 🔥 เพิ่มตรงนี้
         message: err.message,
       };
       return next();
@@ -196,18 +200,26 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user?.userId;
       if (!userId) res.status(401).json({ message: "Unauthorized" });
-      const blogId = (req as any).blogId.toString();
+      const blogId = (req as any).blogId?.toString() || req.params.id;
+      // console.log({ blogId: blogId });
+
+      if (!blogId) {
+        return res.status(400).json({ message: "Missing blogId" });
+      }
       // process coverImage
       if (files["coverImage"]?.[0]) {
         const cover = files["coverImage"][0];
         const filename = `${Date.now()}-${uuidv4()}.jpg`;
         const targetDir = ensureDir(
-          path.join(__dirname, `../upload/${userId}/blog/${blogId}/cover`),
+          // path.join(__dirname, `../upload/${userId}/blog/${blogId}/cover`),
+
+          path.join(process.cwd(), `upload/${userId}/blog/${blogId}/cover`),
         );
         const outputPath = path.join(targetDir, filename);
+        const relativePath = `/upload/${userId}/blog/${blogId}/cover/${filename}`;
         await sharp(cover.buffer).jpeg({ quality: 90 }).toFile(outputPath);
         files["coverImage"][0].filename = filename;
-        files["coverImage"][0].path = outputPath;
+        files["coverImage"][0].path = relativePath;
       }
 
       // process images
@@ -215,20 +227,98 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
         for (const file of files["image"]) {
           const filename = `${Date.now()}-${uuidv4()}.jpg`;
           const targetDir = ensureDir(
-            path.join(__dirname, `../upload/${userId}/blog/${blogId}/images`),
+            // path.join(__dirname, `../upload/${userId}/blog/${blogId}/images`),
+            path.join(
+              process.cwd(),
+              `upload/${userId}/blog/${blogId}/images`,
+            ),
           );
           const outputPath = path.join(targetDir, filename);
+          // 🔥 path สำหรับ save DB (relative)
+          const relativePath = `/upload/${userId}/blog/${blogId}/images/${filename}`;
           await sharp(file.buffer).jpeg({ quality: 90 }).toFile(outputPath);
           file.filename = filename;
-          file.path = outputPath;
+          file.path = relativePath;
         }
       }
       return next();
-    } catch (error) {
-      req.multerError = { type: "sharp", message: err.message };
+    } catch (error: unknown) {
+      req.multerError = {
+        type: "sharp",
+        field: "image-processing",
+        message: error instanceof Error ? error.message : "Unknown sharp error",
+      };
+
       return next();
     }
   });
+};
+export const checkMaxBlogImages = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const blogId = req.params.id;
+    const userId = req.user?.userId;
+
+    if (!blogId) {
+      return res.status(400).json({
+        message: "Blog ID is required",
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+
+    const files = req.files as {
+      coverImage?: Express.Multer.File[];
+      image?: Express.Multer.File[];
+    };
+    const newFilesCount = files?.image?.length || 0;
+
+    const existingCount = await ImageBlog.countDocuments({
+      blog_id: blogId,
+      deletedAt: null,
+    });
+    console.log({ existingCount: existingCount, newFilesCount: newFilesCount });
+
+    if (existingCount + newFilesCount > MAX_BLOG_IMAGES) {
+      // ✅ ลบไฟล์ที่ upload มาแล้วทิ้ง
+      // if (files?.image?.length) {
+      //   for (const file of files.image) {
+      //     if (file.path && fs.existsSync(file.path)) {
+      //       fs.unlinkSync(file.path);
+      //     }
+      //   }
+      // }
+
+      const allFiles = [...(files?.coverImage || []), ...(files?.image || [])];
+
+      allFiles.forEach((file) => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
+
+      req.multerError = {
+        type: "sharp",
+        field: "image",
+        message: `Max ${MAX_BLOG_IMAGES} images allowed`,
+      };
+
+      return next(); // 🔥 สำคัญ
+    }
+
+    return next();
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 };
 // ✅ ใช้ fields() รับทั้ง coverImage และ image พร้อมกัน
 

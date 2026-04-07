@@ -16,11 +16,11 @@ http:
     data:
       - name: title
         type: text
-        value: My First Blog
+        value: Say Yes
         contentType: text
       - name: content
         type: text
-        value: This is my first blog content
+        value: Say Yes
         contentType: text
       - name: tags
         type: text
@@ -29,7 +29,6 @@ http:
       - name: online
         type: text
         value: "true"
-        contentType: boolean
       - name: coverImage
         type: file
         value:
@@ -37,11 +36,13 @@ http:
       - name: image
         type: file
         value:
-          - C:\Users\UsEr\Downloads\653549406_122115634533235489_2154745487496662356_n.jpg
+          - C:\Users\UsEr\Downloads\black-horse-in-ducilo-park-souk-al-bahar-in-dubai-free-image.webp
       - name: image
-        type: file
-        value:
-          - C:\Users\UsEr\Downloads\651925489_122115634443235489_8276176422035274395_n.jpg
+        type: text
+        value: ""
+      - name: image
+        type: text
+        value: ""
   auth: inherit
 
 runtime:

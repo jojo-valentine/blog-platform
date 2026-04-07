@@ -16,7 +16,7 @@ export const useValidation =
     // 1. handle multer error ก่อน
     if (req.multerError) {
       errors.push({
-        field: "file",
+        field: req.multerError.field ?? "file", // ✅ ระบุ field ที่ error
         message: req.multerError.message,
       });
     }

@@ -6,6 +6,7 @@ const HasRoleSchema = new Schema<IHasRole>(
     role_id: { type: Schema.Types.ObjectId, ref: "Role", required: true },
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
     resource: { type: String, required: true },
+  
   },
   { timestamps: true },
 );
