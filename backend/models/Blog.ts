@@ -10,6 +10,7 @@ const BlogSchema = new Schema<IBlog>(
     tags: [String],
     coverImage: [String],
     online: { type: Boolean, default: false },
+    suspended: { type: Boolean, default: false },
     // images: [{ type: Schema.Types.ObjectId, ref: "Image" }],
     deletedAt: { type: Date, default: null },
   },

@@ -23,6 +23,7 @@ async function seedBlog() {
       tags: ["seed", "example"],
       coverImage: [],
       online: false,
+      suspended: false,
       images: [],
     }));
 

@@ -1,0 +1,36 @@
+info:
+  name: admin_blogs_toggle_suspension
+  type: http
+  seq: 21
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/:id/blogs/suspension"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  params:
+    - name: id
+      value: 69d60bf9df4f2c891ab16542
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "action" :"{{action}}"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: action
+      value: suspend
+    - name: action
+      value: unsuspend
+      disabled: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

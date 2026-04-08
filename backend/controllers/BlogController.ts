@@ -96,6 +96,7 @@ class BlogController {
               content,
               tags: parseTags(tags),
               online: online === true || online === "true",
+              suspended: false,
               coverImage: coverImage?.path,
             },
           ],

@@ -6,8 +6,9 @@ export interface IBlog extends Document {
   tags: string[];
   coverImage?: string;
   online: boolean;
+  suspended: boolean;
   images: mongoose.Types.ObjectId[]; // อ้างอิงไปยัง Image
   createdAt: Date;
   updatedAt: Date;
-  deletedAt: Date;
+  deletedAt: Date | null;
 }
