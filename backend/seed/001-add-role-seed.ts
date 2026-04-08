@@ -4,7 +4,7 @@ import { Role } from "../models/Role";
 const seedRoles = [
   {
     name: "admin",
-    permissions: ["create_user", "update_user"],
+    permissions: ["create_user", "update_user","blog_suspension","blog_view"],
   },
   {
     name: "bloger",

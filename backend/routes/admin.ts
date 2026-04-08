@@ -14,11 +14,16 @@ router.get(
   "/list/blogs",
   authMiddleware,
   requireRole("admin"),
-  requirePermission("create_user"),
+  requirePermission("blog_view"),
   AdminController.listBlog,
 );
 
-router.patch("/:id/blogs/suspension", authMiddleware, AdminController.toggleBlogPostSuspension);
-
+router.patch(
+  "/:id/blogs/suspension",
+  authMiddleware,
+  requireRole("admin"),
+  requirePermission("blog_suspension"),
+  AdminController.toggleBlogPostSuspension,
+);
 
 export default router;
