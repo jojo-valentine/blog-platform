@@ -21,6 +21,12 @@ runtime:
       value: jojolala731@gmail.com
     - name: password
       value: pass@P123
+    - name: email
+      value: alice@example.com
+      disabled: true
+    - name: password
+      value: password@P123
+      disabled: true
   scripts:
     - type: after-response
       code: |-

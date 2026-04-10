@@ -4,7 +4,7 @@ info:
   seq: 21
 
 http:
-  method: GET
+  method: PATCH
   url: "{{base_url}}/api/admin/:id/blogs/suspension"
   headers:
     - name: Cookie
@@ -25,9 +25,9 @@ runtime:
   variables:
     - name: action
       value: suspend
+      disabled: true
     - name: action
       value: unsuspend
-      disabled: true
 
 settings:
   encodeUrl: true

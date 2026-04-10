@@ -32,11 +32,11 @@ http:
       - name: coverImage
         type: file
         value:
-          - C:\Users\UsEr\Downloads\HDNtcVQbMAA7Mlq.jpg
+          - C:\Users\UsEr\Downloads\black-horse-in-ducilo-park-souk-al-bahar-in-dubai-free-image.webp
       - name: image
         type: file
         value:
-          - C:\Users\UsEr\Downloads\black-horse-in-ducilo-park-souk-al-bahar-in-dubai-free-image.webp
+          - C:\Users\UsEr\Downloads\beautiful-green-field-scenery-free-image.webp
       - name: image
         type: text
         value: ""

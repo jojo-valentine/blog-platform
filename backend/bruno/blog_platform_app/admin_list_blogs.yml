@@ -5,8 +5,30 @@ info:
 
 http:
   method: GET
-  url: "{{base_url}}/api/admin/list/blogs"
+  url: "{{base_url}}/api/admin/list/blogs?search={{search}}&page={{page}}&tags={{tags}}"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  params:
+    - name: search
+      value: "{{search}}"
+      type: query
+    - name: page
+      value: "{{page}}"
+      type: query
+    - name: tags
+      value: "{{tags}}"
+      type: query
   auth: inherit
+
+runtime:
+  variables:
+    - name: search
+      value: 69d60bf9df4f2c891ab16542
+    - name: page
+      value: "1"
+    - name: tags
+      value: travel,food
 
 settings:
   encodeUrl: true
