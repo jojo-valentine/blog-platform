@@ -1,12 +1,13 @@
 "use client";
-import { Card } from "@/app/components/ui/Card";
-import { InputWithLabel, Input } from "@/app/components/ui/Input";
+import { Card } from "@/app/components/ui/card";
+import { InputWithLabel, Input } from "@/app/components/ui/input";
 import React, { useState } from "react";
-import { buttonVariants } from "@/app/components/ui/Button";
+import { buttonVariants } from "@/app/components/ui/button";
 import Link from "next/link";
-import { Label } from "@/app/components/ui/Label";
+import { Label } from "@/app/components/ui/label";
 import axios from "axios";
 import { API_URL } from "@/app/lib/config";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);

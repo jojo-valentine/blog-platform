@@ -1,6 +1,6 @@
 import Image from "next/image";
-import Banner from "./components/ui/Banner";
-import Featured from "./components/ui/Featured";
+import Banner from "./components/ui/banner";
+import Featured from "./components/ui/featured";
 
 export default function Home() {
   return (
