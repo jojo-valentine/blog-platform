@@ -1,6 +1,6 @@
 import { z } from "zod";
 const fields = {
-  displayName: z.string().min(1, "Display name is required"),
+  display_name: z.string().min(1, "Display name is required"),
   age: z.coerce.number().min(0).max(120).optional().nullable(),
   linkAccounts: z
     .array(
@@ -29,7 +29,7 @@ const fields = {
 export const profileSchemas = {
   update: z
     .object({
-      displayName: fields.displayName.optional(),
+      display_name: fields.display_name.optional(),
       age: fields.age,
       linkAccounts: fields.linkAccounts,
     })

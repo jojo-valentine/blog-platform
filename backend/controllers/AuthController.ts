@@ -3,7 +3,7 @@ import otpService from "../services/otpService";
 import emailService from "../services/emailService";
 import mongoose, { mongo } from "mongoose";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import { HasRole, Otp, Profile, Role } from "../models";
 import { User } from "../models";
 import tokenService from "../services/tokenService";
@@ -159,7 +159,7 @@ class AuthController {
           [
             {
               user_id: user._id,
-              displayName: name,
+              display_name: name,
             },
           ],
           { session },
@@ -211,6 +211,10 @@ class AuthController {
         email: user.email,
         roles: roleData, // 👈 array
         permissions, // 👈 array
+        profile: {
+          avatar: user.profile?.avatar || "",
+          display_name: user.profile?.display_name || "",
+        },  
       };
       // access token อายุสั้น
       const accessToken = jwt.sign(payload, process.env.JWT_SECRET as string, {
@@ -221,22 +225,28 @@ class AuthController {
         expiresIn: "7d",
       });
 
-      const cookieOptions = {
+      // accessToken — อายุ 15 นาที
+      res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: false, // dev
-        sameSite: "lax" as const,
+        sameSite: "lax",
         path: "/",
-        maxAge: refreshToken ? 7 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000,
-      };
-      // เซ็ต cookie
-      // console.log("refreshToken", refreshToken);
-      res.cookie("refreshToken", refreshToken, cookieOptions);
-      // res.cookie("refreshToken", accessToken, cookieOptions);
+        maxAge: 15 * 60 * 1000, // 15 นาที
+      });
 
+      // refreshToken — อายุ 7 วัน
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: false, // dev
+        sameSite: "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 วัน
+      });
       // ถ้า password ถูกต้อง ก็สามารถสร้าง JWT หรือ session ต่อได้
       return res.status(200).json({
         message: "Login successful",
         accessToken,
+        refreshToken,
         payload,
       });
     } catch (err: any) {
@@ -247,7 +257,10 @@ class AuthController {
     const { email } = req.body;
     console.log("reset test");
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).populate({
+      path: "profile",
+      select: "avatar display_name",
+    });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const session = await mongoose.startSession();
@@ -481,7 +494,6 @@ class AuthController {
   }
   static async requestChangeEmail(req: Request, res: Response) {
     const { email } = req.body;
-    console.log(email);
 
     const session = await mongoose.startSession();
     try {
@@ -621,6 +633,107 @@ class AuthController {
       });
     } finally {
       session.endSession();
+    }
+  }
+  static async refreshUser(req: Request, res: Response) {
+    try {
+      const refreshToken = req.cookies?.refreshToken;
+
+      if (!refreshToken) {
+        return res.status(401).json({ message: "No refresh token" });
+      }
+
+      const decoded = jwt.verify(
+        refreshToken,
+        process.env.JWT_SECRET as string,
+      ) as JwtPayload & { id: string };
+      // console.log(decoded);
+
+      const user = await User.findById(decoded.id).populate({
+        path: "profile",
+        select: "avatar display_name",
+      });
+      if (!user) {
+        res.clearCookie("refreshToken");
+        res.clearCookie("accessToken");
+
+        return res.status(401).json({
+          message: "User not found",
+          forceLogout: true,
+        });
+      }
+      // // 🔥 ดึง role
+      const hasRoles = await HasRole.find({ user_id: user._id })
+        .populate<{
+          role_id: IRole;
+        }>("role_id")
+        .lean();
+
+      const roleData = hasRoles.map((r) => r.role_id.name);
+
+      const permissions = hasRoles.flatMap((r) => r.role_id.permissions);
+
+      // // 🔥 4. generate token
+      const payload = {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        roles: roleData, // 👈 array
+        permissions, // 👈 array
+        profile: {
+          avatar: user.profile?.avatar || "",
+          display_name: user.profile?.display_name || "",
+        },
+      };
+      const accessToken = jwt.sign(payload, process.env.JWT_SECRET as string, {
+        expiresIn: "15m",
+      });
+
+      const newRefreshToken = jwt.sign(
+        payload,
+        process.env.JWT_SECRET as string,
+        {
+          expiresIn: "7d",
+        },
+      );
+
+      // ✅ set cookies
+      res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 15 * 60 * 1000,
+      });
+
+      res.cookie("refreshToken", newRefreshToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+      return res.status(200).json({
+        message: "refresh user successful",
+        accessToken,
+        refreshToken,
+        payload,
+      });
+    } catch (err: unknown) {
+      res.clearCookie("newRefreshToken", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+        path: "/",
+      });
+      console.error(
+        "Refresh error:",
+        err instanceof Error ? err.message : "Unknown error",
+      );
+      return res.status(401).json({
+        message: err instanceof Error ? err.message : "Unknown error",
+        forceLogout: true,
+      });
     }
   }
 }

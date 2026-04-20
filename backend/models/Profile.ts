@@ -4,7 +4,7 @@ import { IProfile } from "../types/profile";
 const ProfileSchema = new Schema<IProfile>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    displayName: { type: String, required: true },
+    display_name: { type: String, required: true },
     bio: { type: String, default: null },
     avatar: { type: String, default: null },
 

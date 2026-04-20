@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 const allowedOrigins = [
-  "http://localhost:5000",
+  "http://localhost:3000",
   "http://192.168.1.39:3000",
   "http://192.168.1.36:3000",
 ];

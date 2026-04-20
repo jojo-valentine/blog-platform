@@ -59,9 +59,7 @@ router.put(
   useValidation({ body: authSchemas.update_new_email }),
   AuthController.changeEmail,
 );
-router.get("/test", authMiddleware, (req: Request, res: Response) => {
-  res.send("Auth middlwere route working");
-});
+router.get("/me", AuthController.refreshUser);
 
 // updatepassword
 // updateemail

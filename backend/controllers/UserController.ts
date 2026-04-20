@@ -56,7 +56,7 @@ class UserController {
       function mapBodyToProfile(body: any) {
         return {
           bio: body.age, // map bio -> age
-          displayName: body.displayName, // map name -> name
+          display_name: body.display_name, // map name -> name
           socialLinks: body.linkAccounts || [], // map email -> email
           // เพิ่ม mapping อื่น ๆ ตาม schema
         };

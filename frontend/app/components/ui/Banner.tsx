@@ -18,6 +18,7 @@ export default function Banner({
         backgroundImage: `linear-gradient(120deg, rgba(0,0,0,0.7), rgba(0,0,0,0.9)), 
                           url(${backgroundUrl || "https://images.unsplash.com/photo-1498050108023-c5249f4df085"})`,
       }}
+      
     >
       <div className="hero-content">
         <h1>{title}</h1>

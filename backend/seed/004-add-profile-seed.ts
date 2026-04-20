@@ -27,7 +27,7 @@ async function seedProfile() {
 
       return {
         user_id: u._id,
-        displayName:
+        display_name:
           u.email === "alice@example.com" ? "alice" : randomName,
         bio: null,
         avatar: null,

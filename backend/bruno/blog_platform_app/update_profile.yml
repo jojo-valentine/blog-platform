@@ -12,7 +12,7 @@ http:
   body:
     type: multipart-form
     data:
-      - name: displayName
+      - name: display_name
         type: text
         value: Shadow2
         contentType: text
@@ -47,7 +47,7 @@ http:
 
 runtime:
   variables:
-    - name: displayName
+    - name: display_name
       value: ""
       disabled: true
     - name: bio
