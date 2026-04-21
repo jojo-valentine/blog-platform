@@ -15,26 +15,50 @@ const fields = {
   mobile: z.string().regex(/^\d{10}$/, "Mobile must be 10 digits"),
   password: z
     .string()
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
-      "Password must be strong",
-    )
-    .min(6, "Password must be at least 6 characters"),
+    .min(6, "Password must be at least 6 characters")
+    .refine((val) => /[a-z]/.test(val), {
+      message: "Password must include a lowercase letter",
+    })
+    .refine((val) => /[A-Z]/.test(val), {
+      message: "Password must include an uppercase letter",
+    })
+    .refine((val) => /\d/.test(val), {
+      message: "Password must include a number",
+    })
+    .refine((val) => /[@$!%*?&]/.test(val), {
+      message: "Password must include a special character (@$!%*?&)",
+    }),
 
   newPassword: z
     .string()
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
-      "Password must be strong",
-    )
-    .min(6, "Password must be at least 6 characters"),
+    .min(6, "Password must be at least 6 characters")
+    .refine((val) => /[a-z]/.test(val), {
+      message: "Password must include a lowercase letter",
+    })
+    .refine((val) => /[A-Z]/.test(val), {
+      message: "Password must include an uppercase letter",
+    })
+    .refine((val) => /\d/.test(val), {
+      message: "Password must include a number",
+    })
+    .refine((val) => /[@$!%*?&]/.test(val), {
+      message: "Password must include a special character (@$!%*?&)",
+    }),
   confirmNewPassword: z
     .string()
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
-      "Password must be strong",
-    )
-    .min(6, "Password must be at least 6 characters"),
+    .min(6, "Password must be at least 6 characters")
+    .refine((val) => /[a-z]/.test(val), {
+      message: "Password must include a lowercase letter",
+    })
+    .refine((val) => /[A-Z]/.test(val), {
+      message: "Password must include an uppercase letter",
+    })
+    .refine((val) => /\d/.test(val), {
+      message: "Password must include a number",
+    })
+    .refine((val) => /[@$!%*?&]/.test(val), {
+      message: "Password must include a special character (@$!%*?&)",
+    }),
 };
 
 export const authSchemas = {

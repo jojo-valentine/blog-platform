@@ -38,8 +38,8 @@ class AuthController {
       });
 
       // ❗ 2. send email (ถ้า error → rollback)
-      // await emailService.verifyConnection();
-      // await emailService.sendOtpEmail(email, otp);
+      await emailService.verifyConnection();
+      await emailService.sendOtpEmail(email, otp);
       // 🔥 3. hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -55,7 +55,13 @@ class AuthController {
         process.env.JWT_SECRET as string,
         { expiresIn: "30m" },
       );
-
+      res.cookie("accessToken", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production", // dev ใช้ false
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 60 * 1000, // 30 นาที
+      });
       // ✅ 5. ส่ง token กลับ
       return res.status(200).json({
         message: "OTP sent to email",
@@ -76,7 +82,9 @@ class AuthController {
     const session = await mongoose.startSession();
     let responseData: any = null;
     try {
-      const { otp, token } = req.body;
+      const { otp } = req.body;
+      const token = req.cookies.accessToken;
+
       if (!otp || !token) {
         return res.status(400).json({
           message: "OTP and token are required",
@@ -214,7 +222,7 @@ class AuthController {
         profile: {
           avatar: user.profile?.avatar || "",
           display_name: user.profile?.display_name || "",
-        },  
+        },
       };
       // access token อายุสั้น
       const accessToken = jwt.sign(payload, process.env.JWT_SECRET as string, {

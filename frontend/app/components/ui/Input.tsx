@@ -21,6 +21,25 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
 );
 Input.displayName = "Input";
 
+const InputOTPSlot = React.forwardRef<
+  HTMLInputElement,
+  React.ComponentProps<"input">
+>(({ className, type = "text", ...props }, ref) => {
+  return (
+    <input
+      ref={ref}
+      type={type}
+      maxLength={1}
+      className={cn(
+        "w-14 h-14 text-center text-2xl font-extrabold text-slate-900 bg-slate-100 border border-transparent hover:border-slate-200 appearance-none rounded p-4 outline-none focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100",
+        className,
+      )}
+      {...props}
+    />
+  );
+});
+InputOTPSlot.displayName = "InputOTPSlot";
+
 export function InputWithLabel({ label, className, ...props }: InputProps) {
   return (
     <div className="flex flex-col gap-2">
@@ -35,4 +54,4 @@ export function InputWithLabel({ label, className, ...props }: InputProps) {
     </div>
   );
 }
-export { Input };
+export { Input, InputOTPSlot };
