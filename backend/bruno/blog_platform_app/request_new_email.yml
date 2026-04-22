@@ -1,7 +1,7 @@
 info:
   name: request_new_email
   type: http
-  seq: 11
+  seq: 12
 
 http:
   method: POST

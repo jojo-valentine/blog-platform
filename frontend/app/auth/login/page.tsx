@@ -1,5 +1,5 @@
 "use client";
-import { Card } from "@/app/components/ui/card";
+import { Card ,CardHeader ,CardTitle ,CardDescription ,CardContent , CardFooter} from "@/app/components/ui/card";
 import { InputWithLabel, Input } from "@/app/components/ui/input";
 import React, { useEffect, useState } from "react";
 import { buttonVariants } from "@/app/components/ui/button";
@@ -112,14 +112,13 @@ export default function LoginPage() {
       >
         <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
           <Card className="w-full max-w-xl mx-auto p-6">
-            <div>
-              <h2 className="text-xl text-black dark:text-black font-semibold mb-1">
-                Welcome
-              </h2>
-              <p className="text-gray-600 mb-6">
-                This is a reusable card component.
-              </p>
-            </div>
+          <CardHeader className="text-center">
+            <CardTitle className="font-heading text-2xl">
+             Welcome
+            </CardTitle>
+            <CardDescription>This is a reusable card component.</CardDescription>
+          </CardHeader>
+          < CardContent>
             {/* <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="pl-10 pr-10" required /> */}
             <form
               action=""
@@ -157,7 +156,7 @@ export default function LoginPage() {
                       className={`w-full rounded-md border 
                   bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 
                   pl-10 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ring-offset-blue-600
-                  ${errors.email ? "border-red- ring-offset-red-600 focus:ring-red-500" : "border-gray-300 dark:border-gray-700"}`}
+                  ${errors.email ? "border-red- ring-offset-red-600 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2" : "border-gray-300 dark:border-gray-700"}`}
                       value={form.email}
                       onChange={handleChange}
                     />
@@ -196,7 +195,7 @@ export default function LoginPage() {
                       className={`w-full rounded-md border 
                   bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 
                   pl-10 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ring-offset-blue-600
-                  ${errors.password ? "border-red- ring-offset-red-600 focus:ring-red-500" : "border-gray-300 dark:border-gray-700"}`}
+                  ${errors.password ? "border-red- ring-offset-red-600 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2" : "border-gray-300 dark:border-gray-700"}`}
                       value={form.password}
                       onChange={handleChange}
                     />
@@ -244,6 +243,8 @@ export default function LoginPage() {
                 </button>
               </div>
             </form>
+            </CardContent>
+            <CardFooter>
             <div className="mt-5">
               <p className="text-sm text-muted-foreground">
                 Don't have an account?
@@ -258,13 +259,14 @@ export default function LoginPage() {
               <p className="text-sm text-muted-foreground">
                 Forgot password?
                 <Link
-                  href="/auth/register"
+                  href="/pages/forgot-password" 
                   className="ml-3 font-medium text-blue-600 hover:underline cursor-pointer"
                 >
                   Click here
                 </Link>
               </p>
             </div>
+            </CardFooter>
           </Card>
         </div>
       </motion.div>

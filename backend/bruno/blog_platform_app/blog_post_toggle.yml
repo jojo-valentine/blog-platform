@@ -1,7 +1,7 @@
 info:
   name: blog_post_toggle
   type: http
-  seq: 18
+  seq: 19
 
 http:
   method: PATCH

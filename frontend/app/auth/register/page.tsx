@@ -46,7 +46,7 @@ export default function page() {
 
     setErrors((prev) => ({ ...prev, [id]: "" }));
   };
-  const handdleRegister = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrors({});
@@ -105,7 +105,7 @@ export default function page() {
             </CardTitle>
             <CardDescription>Join BlogSpace and start writing</CardDescription>
           </CardHeader>
-          <form onSubmit={handdleRegister}>
+          <form onSubmit={handleRegister}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Display Name</Label>

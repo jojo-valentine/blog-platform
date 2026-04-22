@@ -1,14 +1,16 @@
 import { Request, Response } from "express";
 import otpService from "../services/otpService";
 import emailService from "../services/emailService";
+import tokenServices from "../services/tokenService";
 import mongoose, { mongo } from "mongoose";
 import bcrypt from "bcrypt";
 import jwt, { JwtPayload } from "jsonwebtoken";
-import { HasRole, Otp, Profile, Role } from "../models";
+import { HasRole, Otp, Profile, ResetToken, Role } from "../models";
 import { User } from "../models";
 import tokenService from "../services/tokenService";
 import { IRole } from "../types";
 import { success } from "zod";
+import crypto from "crypto";
 
 class AuthController {
   static async register(req: Request, res: Response) {
@@ -263,7 +265,8 @@ class AuthController {
   }
   static async passwordResetVerifyCheck(req: Request, res: Response) {
     const { email } = req.body;
-    console.log("reset test");
+
+    // console.log(email);
 
     const user = await User.findOne({ email }).populate({
       path: "profile",
@@ -273,39 +276,46 @@ class AuthController {
 
     const session = await mongoose.startSession();
     try {
-      const otp = otpService.generateOTP();
-      await emailService.verifyConnection();
-      // 🔥 1. ทำเฉพาะ DB ใน transaction
-      // 2. สร้าง OTP + commit
-      const record = await session.withTransaction(async () => {
-        return await otpService.createOtp(
-          {
-            contact: email,
-            otp,
-            type: "reset_password",
-          },
-          { session },
+      // const otp = otpService.generateOTP();
+
+      const rawToken = await session.withTransaction(async () => {
+        return await tokenServices.generateRefreshToken(
+          user._id.toString(),
+          session,
         );
       });
 
+      await emailService.verifyConnection();
+      // 🔥 1. ทำเฉพาะ DB ใน transaction
+      // 2. สร้าง OTP + commit
+      // const record = await session.withTransaction(async () => {
+      //   return await otpService.createOtp(
+      //     {
+      //       contact: email,
+      //       otp,
+      //       type: "reset_password",
+      //     },
+      //     { session },
+      //   );
+      // });
+
       // ❗ 2. send email (ถ้า error → rollback)
-
-      // await emailService.sendOtpEmail(email, otp);
-
-      const token = jwt.sign(
-        {
-          email,
-          type: "reset_password",
-          otpId: record._id,
-        },
-        process.env.JWT_SECRET as string,
-        { expiresIn: "30m" },
-      );
+      const link = `${process.env.CLIENT_URL}/pages/forgot-password/update-password?token=${rawToken}`;
+      await emailService.sendForgetPasswordEmail(email, link);
+      // const token = jwt.sign(
+      //   {
+      //     email,
+      //     type: "reset_password",
+      //     otpId: record._id,
+      //   },
+      //   process.env.JWT_SECRET as string,
+      //   { expiresIn: "30m" },
+      // );
 
       return res.status(200).json({
-        message: "you has been successfuly reset otp",
-        otp: otp,
-        token,
+        message: "you has been successfully reset otp",
+        // otp: otp,
+        token: rawToken,
       });
     } catch (err: any) {
       console.error("🔴 resent password error:", err); // log ทั้ง object ไม่ใช่แค่ message
@@ -316,86 +326,59 @@ class AuthController {
       session.endSession(); // ✅ ต้องมี
     }
   }
+  static async passwordVerifyResetToken(req: Request, res: Response) {
+    const { token } = req.body;
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    try {
+      const resetToken = await ResetToken.findOne({ token: hashedToken });
+      if (!resetToken || resetToken.expiresAt < new Date()) {
+        return res.status(400).json({ valid: false, message: "Token expired" });
+      }
+      res.json({ valid: true });
+    } catch (err) {
+      res.status(500).json({ valid: false, message: "Server error" });
+    }
+  }
   static async passwordUpdate(req: Request, res: Response) {
     const session = await mongoose.startSession();
     let decoded: any;
 
     try {
-      const { otp, token, password } = req.body;
-
-      try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET as string);
-      } catch {
-        return res.status(401).json({
-          message: "Invalid or expired token",
-        });
-      }
+      const { token, password, password_confirm } = req.body;
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
 
       await session.withTransaction(async () => {
-        const { email, type } = decoded;
-        // console.log({
-        //   email: email,
-        //   type: type,
-        // });
-        if (!otp || !token) {
-          throw new Error("OTP and token are required");
-        }
-        if (!password) {
-          throw new Error("please provide password");
-        }
-        if (decoded.type !== "reset_password") {
-          throw new Error("Invalid token type");
-        }
-
-        const record = await Otp.findOne({
-          _id: decoded.otpId,
-          type: "reset_password",
-          contact: email,
-        })
-          // .sort({ createdAt: -1 })
-          .session(session);
-
-        if (!record) {
-          throw new Error("OTP not found");
-        }
-        // 🔥 3. เช็คหมดอายุ
-        if (record.expiresAt < new Date()) {
-          throw new Error("OTP expired");
-        }
-        // 🔥 4. เช็คว่าใช้ไปแล้ว
-        if (record.verifyAt) {
-          throw new Error("OTP already used");
-        }
-        // 🔥 5. compare OTP
-        const isValid = await bcrypt.compare(otp, record.otpHash);
-        if (!isValid) {
-          throw new Error("Invalid OTP");
-        }
-        // 🔥 6. mark verify
-        record.verifyAt = new Date();
-        await record.save({ session });
-
-        const user = await User.findOne({
-          email,
+        const resetToken = await ResetToken.findOne({
+          token: hashedToken,
         }).session(session);
-
-        if (!user) {
-          throw new Error("user not found");
+        if (!resetToken || resetToken.expiresAt < new Date()) {
+          // return res.status(400).json({ valid: false, message: "Token expired" });
+          throw new Error("Invalid or expired token");
         }
 
-        user.password = await bcrypt.hash(password, 10);
+        if (password !== password_confirm) {
+          throw new Error("Passwords do not match");
+        }
+        const user = await User.findById(resetToken.user_id).session(session);
+        if (!user) {
+          throw new Error("not found user");
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        user.password = hashedPassword;
         await user.save({ session });
+        await ResetToken.deleteOne({ _id: resetToken._id }).session(session);
       });
 
       return res.status(200).json({
-        message: "you has beed update password plase login again",
+        message: "you has been update password please login again",
       });
     } catch (err: any) {
       // console.error("🔴 passwordUpdate error:", err);
-      console.log("JWT ERROR:", err); // 👈 เพิ่มบรรทัดนี้
-      return res.status(401).json({
-        message: "Invalid or expired token",
-      });
       return res.status(400).json({
         message: err.message || "Something went wrong",
       });

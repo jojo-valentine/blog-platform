@@ -24,7 +24,9 @@ router.post(
   AuthController.login,
 );
 router.post("/verify-register-otp/", AuthController.verifyRegisterOtp);
-router.post("/reset/password/", AuthController.passwordResetVerifyCheck);
+router.post("/reset/forgot-password/", AuthController.passwordResetVerifyCheck);
+router.post("/verify-reset-token", AuthController.passwordVerifyResetToken);
+
 router.patch(
   "/reset/update/password/",
   useValidation({ body: authSchemas.update_reset_password }),

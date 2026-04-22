@@ -5,6 +5,6 @@ import { Blog } from "./Blog";
 import { ImageBlog } from "./ImageBlog";
 import { HasRole } from "./HasRole";
 import { Otp } from "./Otp";
-import { RefreshToken } from "./RefreshToken";
+import { ResetToken } from "./ResetToken";
 
-export { Role, User, Profile, Blog, ImageBlog, HasRole, Otp, RefreshToken };
+export { Role, User, Profile, Blog, ImageBlog, HasRole, Otp, ResetToken };
