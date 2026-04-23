@@ -67,18 +67,27 @@ const createUploadMiddleware =
       if (!req.file || !req.file.buffer) return next();
 
       try {
+        const userId = req.user?.userId;
+        if (!userId) throw new Error("Unauthorized");
+
         const filename = `${Date.now()}-${uuidv4()}.jpg`;
-        // 👉 เอา id จาก req (เช่น req.user.id หรือ req.params.id)
         const targetDir = getTargetDir(req);
-        const outputPath = path.join(ensureDir(targetDir), filename);
-        await sharp(req.file.buffer)
-          // .resize(500, 500, { fit: "cover" })
-          .jpeg({ quality: 90 })
-          .toFile(outputPath);
+
+        // ensure dir exists
+        fs.mkdirSync(targetDir, { recursive: true });
+
+        const outputPath = path.join(targetDir, filename);
+
+        await sharp(req.file.buffer).jpeg({ quality: 90 }).toFile(outputPath);
+
+        // relative path สำหรับ DB/frontend
+        const relativePath = `/upload/${userId}/avatar/${filename}`;
 
         req.file.filename = filename;
-        req.file.path = outputPath;
+        req.file.path = relativePath;
+        (req.file as any).fullPath = outputPath; // absolute path สำหรับจัดการไฟล์จริง
 
+        // console.log({ relativePath });
         return next();
       } catch (sharpError: any) {
         if (sharpError?.message === "Unauthorized") {
@@ -140,12 +149,7 @@ const createUploadMultipleMiddleware =
 
 export const uploadAvatar = createUploadMiddleware("avatar", (req) => {
   const userId = req.user?.userId;
-  // console.log({ userId: req.user, user: req.user });
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
+  if (!userId) throw new Error("Unauthorized");
   return path.join(__dirname, `../upload/${userId}/avatar`);
 });
 // รูป cover หลักของ blog
@@ -228,10 +232,7 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
           const filename = `${Date.now()}-${uuidv4()}.jpg`;
           const targetDir = ensureDir(
             // path.join(__dirname, `../upload/${userId}/blog/${blogId}/images`),
-            path.join(
-              process.cwd(),
-              `upload/${userId}/blog/${blogId}/images`,
-            ),
+            path.join(process.cwd(), `upload/${userId}/blog/${blogId}/images`),
           );
           const outputPath = path.join(targetDir, filename);
           // 🔥 path สำหรับ save DB (relative)

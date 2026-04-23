@@ -43,12 +43,20 @@ router.put(
   useValidation({ body: profileSchemas.update }),
   UserController.updateProfile,
 );
+router.post(
+  "/profile/avatar",
+  authMiddleware,
+  uploadAvatar,
+  // useValidation({ body: profileSchemas.avatar }),
+  UserController.uploadAvatar,
+);
 router.patch(
   "/update-password",
   authMiddleware,
   useValidation({ body: authSchemas.update_new_password }),
   AuthController.updateNewPassword,
 );
+
 router.post(
   "/request-change-email",
   authMiddleware,

@@ -24,7 +24,6 @@ const fields = {
         return item;
       }),
     ),
-    
 };
 export const profileSchemas = {
   update: z
@@ -36,4 +35,5 @@ export const profileSchemas = {
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field is required",
     }),
+  avatar: z.object({ avatar: z.string().min(1, "Avatar path is required") }),
 };

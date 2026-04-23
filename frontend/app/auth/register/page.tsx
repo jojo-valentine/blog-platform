@@ -200,7 +200,7 @@ export default function page() {
                 Already have an account?{" "}
                 <Link
                   href="/auth/login"
-                  className="font-medium text-foreground hover:underline"
+                  className=" font-medium text-foreground hover:underline cursor-pointer"
                 >
                   Sign in
                 </Link>
