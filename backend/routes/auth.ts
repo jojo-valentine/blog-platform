@@ -39,7 +39,7 @@ router.get("/profile", authMiddleware, UserController.profile);
 router.put(
   "/profile/update",
   authMiddleware,
-  uploadAvatar,
+  // uploadAvatar,
   useValidation({ body: profileSchemas.update }),
   UserController.updateProfile,
 );

@@ -1,7 +1,7 @@
 info:
   name: update_profile
   type: http
-  seq: 10
+  seq: 11
 
 http:
   method: PUT
@@ -56,7 +56,7 @@ runtime:
     - name: avatar
       value: ""
       disabled: true
-    - name: socialLinks
+    - name: social_links
       value: ""
       disabled: true
 

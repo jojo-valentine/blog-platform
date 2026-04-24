@@ -17,7 +17,13 @@ class UserController {
     // console.log({ decoded: decoded });
     const { id } = decoded;
     try {
-      const user = await User.findById(id).populate("profile");
+      const user = await User.findById(id)
+        .select("name email mobile")
+        .populate({
+          path: "profile",
+          // match: { deletedAt: null },
+          select: "user_id display_name bio avatar social_links",
+        });
       if (!user) {
         return res.status(404).json({
           message: "not found user",
@@ -41,7 +47,7 @@ class UserController {
     // 1. handle multer error ก่อน
     if (req.multerError) {
       errors.push({
-        field: req.multerError.field ?? "file avatar", // ✅ ระบุ field ที่ error
+        field: req.multerError.field ?? "avatar", // ✅ ระบุ field ที่ error
         message: req.multerError.message ?? "please select image avatar upload",
       });
     }
@@ -116,60 +122,53 @@ class UserController {
     }
   }
   static async updateProfile(req: Request, res: Response) {
-    const file = req.file;
-    const body = req.body;
-    // const errors = [];
-
-    // console.log({
-    //   file: file,
-    //   body: body,
-    //   user: req.user,
-    // });
     const session = await mongoose.startSession();
     try {
-      const profileUser = await Profile.findOne({
-        user_id: req.user?.userId,
-      }).session(session);
+      const { name, display_name, mobile, age, social_links } = req.body;
+      const userId = req.user?.userId;
 
-      if (!profileUser) {
-        throw new Error("Profile not found");
-      }
-      function mapBodyToProfile(body: any) {
-        return {
-          bio: body.age, // map bio -> age
-          display_name: body.display_name, // map name -> name
-          socialLinks: body.linkAccounts || [], // map email -> email
-          // เพิ่ม mapping อื่น ๆ ตาม schema
-        };
-      }
+      let result;
 
-      await Profile.findOneAndUpdate(
-        { user_id: req.user?.userId },
-        {
-          ...mapBodyToProfile(body),
-          ...(file && { avatar: file.filename }), // ✅ update avatar ถ้ามีไฟล์
-        },
-        { new: true, session },
-      );
+      await session.withTransaction(async () => {
+        // หา user และ profile
+        const user = await User.findById(userId).session(session);
+        const profileUser = await Profile.findOne({ user_id: userId }).session(
+          session,
+        );
 
-      return res.status(200).json({
-        message: "successfury data update",
+        if (!profileUser) {
+          throw new Error("Profile not found");
+        }
+
+        // update user
+        await user?.updateOne({ $set: { name, mobile } }, { session });
+
+        // update profile
+        result = await Profile.updateOne(
+          { user_id: userId },
+          { $set: { display_name, bio: age, social_links: social_links } },
+          { session },
+        );
       });
-    } catch (err: any) {
-      console.error("🔥 profileUpdate ERROR =>", err);
 
-      // ลบไฟล์ถ้า error
-      if (file && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
+      // ถ้า transaction สำเร็จ → commit อัตโนมัติ
+      return res.status(200).json({
+        message: "successfully data update",
+        data: result,
+      });
+    } catch (err: unknown) {
+      const error = err as Error;
+
+      if (error.message === "Profile not found") {
+        return res.status(404).json({ message: error.message });
       }
 
-      if (err.message === "Profile not found") {
-        return res.status(404).json({ message: "Profile not found" });
-      }
-
-      return res.status(500).json({ message: "Internal server error" });
+      // ถ้า error → rollback อัตโนมัติ
+      return res.status(500).json({
+        message: err instanceof Error ? err.message : "Internal server error",
+      });
     } finally {
-      session.endSession(); // ✅ ปิด session เสมอ
+      await session.endSession(); // ✅ ปิด session เสมอ
     }
   }
 }

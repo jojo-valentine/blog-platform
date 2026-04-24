@@ -1,7 +1,7 @@
 info:
   name: upload_avatar_profile
   type: http
-  seq: 24
+  seq: 10
 
 http:
   method: POST
@@ -28,7 +28,7 @@ runtime:
     - name: avatar
       value: ""
       disabled: true
-    - name: socialLinks
+    - name: social_links
       value: ""
       disabled: true
 

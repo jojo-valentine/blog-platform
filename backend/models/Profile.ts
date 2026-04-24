@@ -8,7 +8,7 @@ const ProfileSchema = new Schema<IProfile>(
     bio: { type: String, default: null },
     avatar: { type: String, default: null },
 
-    socialLinks: [
+    social_links: [
       {
         platform: { type: String, required: true },
         url: { type: String, required: true },

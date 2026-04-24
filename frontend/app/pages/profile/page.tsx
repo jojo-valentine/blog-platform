@@ -18,14 +18,90 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/app/components/ui/avatar";
-import { Camera, Lock, Eye, EyeOff, Save, Pencil, PenLine } from "lucide-react";
+import {
+  Camera,
+  Lock,
+  Eye,
+  EyeOff,
+  Save,
+  Pencil,
+  PenLine,
+  Form,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import axios from "axios";
 import { API_URL } from "@/app/lib/config";
-
+import Swal from "sweetalert2";
 type ErrorsImage = {
   avatar?: string;
+};
+type ErrorsProfile = {
+  name: string;
+  mobile: string;
+  profile: {
+    display_name?: string;
+    avatar?: string;
+    bio?: string;
+    social_links?: string[];
+  };
+};
+// กำหนด type ของ profile
+interface SocialLink {
+  _id?: string;
+  platform: string;
+  url: string;
+}
+type Profile = {
+  name: string;
+  email: string;
+  mobile: string;
+  profile: {
+    display_name: string;
+    avatar?: string;
+    bio?: string;
+    social_links?: SocialLink[];
+  };
+};
+type ProfileFrom = {
+  name: string;
+  mobile: string;
+  profile: {
+    display_name: string;
+    bio?: string;
+    social_links: SocialLink[];
+  };
+};
+const initialProfile = {
+  name: "",
+  email: "",
+  mobile: "",
+  profile: {
+    display_name: "",
+    avatar: "",
+    bio: "",
+    social_links: [],
+  },
+};
+
+const initialProfileForm: ProfileFrom = {
+  name: "",
+  mobile: "",
+  profile: {
+    display_name: "",
+    bio: "",
+    social_links: [],
+  },
+};
+const initialErrorsProfile: ErrorsProfile = {
+  name: "",
+  mobile: "",
+  profile: {
+    display_name: "",
+    avatar: "",
+    bio: "",
+    social_links: [],
+  },
 };
 export default function () {
   const { user, loading: authLoading, setUser } = useAuth();
@@ -41,12 +117,87 @@ export default function () {
   const [modelEmailEdit, setModelEmailEdit] = useState(false);
   const [modelPasswordEdit, setModelPasswordEdit] = useState(false);
   const [displayName, setDisplayName] = useState("");
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [profileForm, setProfileForm] =
+    useState<ProfileFrom>(initialProfileForm);
+  const [errorsProfileForm, setErrorsProfileForm] =
+    useState<ErrorsProfile>(initialErrorsProfile);
+  // ใช้กับ useState
+  const [profile, setProfile] = useState<Profile>(initialProfile);
+  const fetchedRef = useRef(false);
+  const handleChangeProfile = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { id, value } = e.target;
+    if (["display_name", "bio", "mobile"].includes(id)) {
+      setProfileForm((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          [id]: value,
+        },
+      }));
+    } else {
+      setProfileForm((prev) => ({
+        ...prev,
+        [id]: value,
+      }));
+    }
 
+    setErrorsProfileForm((prev) => ({
+      ...prev,
+      [id]: "",
+      profile: {
+        ...prev.profile,
+        [id]: "",
+      },
+    }));
+  };
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace("/auth/login");
     }
+
+    if (user && !fetchedRef.current) {
+      fetchedRef.current = true;
+      fetchProfile();
+    }
   }, [user, authLoading, router]);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/auth/profile`, {
+        withCredentials: true,
+      });
+
+      const data = res.data.user;
+      setProfile({
+        email: data.email,
+        mobile: data.mobile,
+        name: data.name,
+        profile: {
+          avatar: data.profile?.avatar ?? "",
+          bio: data.profile?.bio ?? "",
+          display_name: data.profile?.display_name ?? "",
+          social_links: data.profile?.social_links ?? [],
+        },
+      });
+      setProfileForm({
+        mobile: data.mobile,
+        name: data.name,
+        profile: {
+          bio: data.profile?.bio ?? "",
+          display_name: data.profile?.display_name ?? "",
+          social_links: data.profile?.social_links ?? [],
+        },
+      });
+    } catch (error: any) {
+      console.error(
+        "Fetch profile failed:",
+        error.response?.data || error.message,
+      );
+    }
+  };
 
   const initialForm = {
     email: "",
@@ -127,7 +278,86 @@ export default function () {
     setModelEmailEdit(false);
     setModelPasswordEdit(false);
   };
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoadingProfile(true);
+    setErrorsProfileForm(initialErrorsProfile);
 
+    const formDate = {
+      mobile: profileForm.mobile,
+      name: profileForm.name,
+      age: profileForm.profile.bio,
+      display_name: profileForm.profile.display_name,
+      social_links: profileForm.profile.social_links,
+    };
+    console.log(formDate);
+
+    try {
+      const res = await axios.put(
+        `${API_URL}/api/auth/profile/update`,
+        formDate,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          withCredentials: true,
+        },
+      );
+      const data = res.data.user;
+      console.log(res.data);
+
+      // setProfile({
+      //   email: data.email,
+      //   mobile: data.mobile,
+      //   name: data.name,
+      //   profile: {
+      //     avatar: data.profile?.avatar ?? "",
+      //     bio: data.profile?.bio ?? "",
+      //     display_name: data.profile?.display_name ?? "",
+      //     social_links: data.profile?.social_links ?? [],
+      //   },
+      // });
+      // setProfileForm({
+      //   mobile: data.mobile,
+      //   name: data.name,
+      //   profile: {
+      //     bio: data.profile?.bio ?? "",
+      //     display_name: data.profile?.display_name ?? "",
+      //     social_links: data.profile?.social_links ?? [],
+      //   },
+      // });
+      // Swal.fire({
+      //   title: "Profile updated 🎉",
+      //   icon: "success",
+      //   // timer: 1200,
+      //   showConfirmButton: false,
+      // });
+    } catch (error: any) {
+      const err = error.response?.data;
+
+      if (Array.isArray(err?.errors)) {
+        const fieldErrorsProfile: ErrorsProfile = initialErrorsProfile;
+
+        err.errors.forEach(
+          (e: { field: keyof ErrorsProfile; message: string }) => {
+            fieldErrorsProfile[e.field] = e.message;
+          },
+        );
+
+        setErrorsProfileForm(fieldErrorsProfile); // ✅ ใช้ตัวนี้
+      } else {
+        Swal.fire({
+          title: "Error",
+          icon: "error",
+          // timer: 1500,
+          showConfirmButton: false,
+          text: err?.message || "Something went wrong", // ✅ แก้ตรงนี้
+        });
+      }
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
   const handleEditEmail = () => {
     setModelEmailEdit((prev) => !prev); // ✅ toggle
     setModelProfileEdit(false);
@@ -202,38 +432,56 @@ export default function () {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <div>
-              <p>username : nawongjathapon</p>
+              <p>username : {profile.name || "ไม่ระบุ"}</p>
               <small className="text-gray-500 text-xs">
                 ใช้สำหรับเข้าสู่ระบบและแสดงต่อสาธารณะ
               </small>
             </div>
             <div>
-              <p>display name : test</p>
+              <p>display name : {profile.profile.display_name || "ไม่ระบุ"}</p>
               <small className="text-gray-500 text-xs">
                 ชื่อที่จะแสดงในหน้าโปรไฟล์
               </small>
             </div>
             <div>
-              <p>bio : 18</p>
+              <p>bio : {profile.profile.bio || "ไม่ระบุ"}</p>
               <small className="text-gray-500 text-xs">
                 เขียนคำอธิบายสั้น ๆ เกี่ยวกับตัวคุณ
               </small>
             </div>
             <div>
-              <p>socialLinks : test</p>
+              <p>social_links </p>
+              {/* {(profile.profile.social_links?.length ?? 0) > 5 ? ( */}
+              {profile.profile.social_links ? (
+                profile.profile.social_links!.map((link) => (
+                  <div key={link._id}>
+                    <span>{link.platform}: </span>
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      className="text-blue-500"
+                    >
+                      {link.url}
+                    </a>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-400">ไม่ระบุ</p>
+              )}
+
               <small className="text-gray-500 text-xs">
                 เพิ่มลิงก์ไปยังโซเชียลมีเดียของคุณ
               </small>
             </div>
             <div>
-              <p>mobile : 095</p>
+              <p>mobile : {profile.mobile || "ไม่ระบุ"}</p>
               <small className="text-gray-500 text-xs">
                 เบอร์โทรศัพท์สำหรับติดต่อ
               </small>
             </div>
             <div className=" flex ">
               <div>
-                <p>email : test</p>
+                <p>email : {profile.email || "ไม่ระบุ"}</p>
                 <small className="text-gray-500 text-xs">
                   ใช้สำหรับยืนยันตัวตนและการแจ้งเตือน
                 </small>
@@ -244,7 +492,7 @@ export default function () {
                 onClick={handleEditEmail}
               >
                 <PenLine className=" mx-4 h-4 w-4 text-shadow-accent-foreground  cursor-pointer" />
-                change password
+                change email
               </button>
             </div>
             <div className=" flex ">
@@ -265,7 +513,7 @@ export default function () {
 
           <Button
             onClick={handleEditProfile}
-            // disabled={loading}
+            disabled={loadingProfile}
             className="cursor-pointer"
           >
             <Pencil className=" h-4 w-4 text-shadow-accent-foreground" />
@@ -291,67 +539,150 @@ export default function () {
                 This is how your name appears on your blog posts
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Name</Label>
-                <Input
-                  id="displayName"
-                  //   value={displayName}
-                  //   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your display name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="displayName">display name </Label>
-                <Input
-                  id="displayName"
-                  //   value={displayName}
-                  //   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your display name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="displayName">bio </Label>
-                <Input
-                  id="bio"
-                  //   value={displayName}
-                  //   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your bio "
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="displayName">socialLinks</Label>
-                {/* <Input
-              id="displayName"
-              //   value={displayName}
-              //   onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your display name"
-            /> */}
-                <Textarea
-                  name=""
-                  id=""
-                  placeholder="socialLinks"
-                  rows={4}
-                  cols={50}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="displayName">mobile</Label>
-                <Input
-                  id="mobile"
-                  //   value={displayName}
-                  //   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your display mobile "
-                />
-              </div>
+            <form onSubmit={handleSaveProfile}>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">name</Label>
+                  <Input
+                    id="name"
+                    // value={displayName}
+                    // onChange={(e) => setDisplayName(e.target.value)}
+                    value={profileForm.name}
+                    onChange={handleChangeProfile}
+                    placeholder="Enter you name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="display_name">display name</Label>
+                  <Input
+                    id="display_name"
+                    value={profileForm.profile.display_name}
+                    onChange={handleChangeProfile}
+                    placeholder="Your display name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bio">bio</Label>
+                  <Input
+                    id="bio"
+                    value={profileForm.profile.bio}
+                    onChange={handleChangeProfile}
+                    placeholder="Your bio "
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    {profileForm.profile.social_links.length < 5 ? (
+                      <button
+                        onClick={() =>
+                          setProfileForm((prev) => ({
+                            ...prev,
+                            profile: {
+                              ...prev.profile,
+                              social_links: [
+                                ...prev.profile.social_links,
+                                { platform: "", url: "" },
+                              ],
+                            },
+                          }))
+                        }
+                        type="button"
+                        className="text-blue-500 mt-2"
+                      >
+                        + เพิ่ม social link
+                      </button>
+                    ) : (
+                      <></>
+                    )}
+                  </div>
+                  <Label htmlFor="displayName">social_links</Label>
+                  {profileForm.profile.social_links.map((link, index) => (
+                    <div key={index} className="flex gap-2 mb-2">
+                      {/* platform */}
+                      <select
+                        value={link.platform}
+                        onChange={(e) => {
+                          const newLinks = [
+                            ...profileForm.profile.social_links,
+                          ];
+                          newLinks[index].platform = e.target.value;
+                          // setSocial_links(newLinks);
+                          setProfileForm((prev) => ({
+                            ...prev,
+                            profile: {
+                              ...prev.profile,
+                              social_links: newLinks,
+                            },
+                          }));
+                        }}
+                        required
+                        className="border p-2 rounded  bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">-- Select Platform --</option>
+                        <option value="youtube">YouTube</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="other">other</option>
+                      </select>
 
-              <Button
-              //   onClick={handleSaveProfile} disabled={loading}
-              >
-                <Save className="mr-1.5 h-4 w-4" />
-                {/* {loading ? "Saving..." : "Save Changes"} */}
-              </Button>
-            </CardContent>
+                      {/* url */}
+                      <input
+                        type="text"
+                        value={link.url}
+                        onChange={(e) => {
+                          const newLinks = [
+                            ...profileForm.profile.social_links,
+                          ];
+                          newLinks[index].url = e.target.value;
+                          setProfileForm((prev) => ({
+                            ...prev,
+                            profile: {
+                              ...prev.profile,
+                              social_links: newLinks,
+                            },
+                          }));
+                        }}
+                        placeholder="https://..."
+                        className="border p-2 flex-1 rounded"
+                      />
+
+                      {/* delete */}
+                      <button
+                        onClick={() => {
+                          setProfileForm((prev) => ({
+                            ...prev,
+                            profile: {
+                              ...prev.profile,
+                              social_links: prev.profile.social_links.filter(
+                                (_, i) => i !== index,
+                              ),
+                            },
+                          }));
+                        }}
+                        type="button"
+                        className="text-red-500"
+                      >
+                        ลบ
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">mobile</Label>
+                  <Input
+                    id="mobile"
+                    value={profileForm.mobile}
+                    onChange={handleChangeProfile}
+                    placeholder="Your  mobile "
+                  />
+                </div>
+
+                <Button disabled={loadingProfile}>
+                  <Save className="mr-1.5 h-4 w-4" />
+                  {loadingProfile ? "Saving..." : "Save Changes"}
+                </Button>
+              </CardContent>
+            </form>
           </Card>
         </motion.div>
       )}

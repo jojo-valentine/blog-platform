@@ -2,9 +2,19 @@ import { User, Profile } from "../models";
 
 async function seedProfile() {
   const nameRandom = [
-    "jim","john","jack","alden","rover",
-    "laibath","lanter","lee","rezael",
-    "vagar","youtber","hana","nao",
+    "jim",
+    "john",
+    "jack",
+    "alden",
+    "rover",
+    "laibath",
+    "lanter",
+    "lee",
+    "rezael",
+    "vagar",
+    "youtber",
+    "hana",
+    "nao",
   ];
 
   try {
@@ -27,11 +37,10 @@ async function seedProfile() {
 
       return {
         user_id: u._id,
-        display_name:
-          u.email === "alice@example.com" ? "alice" : randomName,
+        display_name: u.email === "alice@example.com" ? "alice" : randomName,
         bio: null,
         avatar: null,
-        socialLinks: null,
+        social_links: null,
       };
     });
 

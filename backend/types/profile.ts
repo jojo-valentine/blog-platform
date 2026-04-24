@@ -4,5 +4,5 @@ export interface IProfile extends Document {
   display_name: string;
   bio?: string;
   avatar?: string;
-  socialLinks?: string[];
+  social_links?: string[];
 }

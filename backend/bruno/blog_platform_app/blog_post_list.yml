@@ -1,7 +1,7 @@
 info:
   name: blog_post_list
   type: http
-  seq: 13
+  seq: 14
 
 http:
   method: GET
