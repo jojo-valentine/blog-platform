@@ -26,6 +26,7 @@ import {
   Save,
   Pencil,
   PenLine,
+  Mail,
   Form,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,7 @@ import { motion } from "framer-motion";
 import axios from "axios";
 import { API_URL } from "@/app/lib/config";
 import Swal from "sweetalert2";
+import { isArray } from "util";
 type ErrorsImage = {
   avatar?: string;
 };
@@ -42,8 +44,11 @@ type ErrorsProfile = {
   profile: {
     display_name?: string;
     avatar?: string;
-    bio?: string;
-    social_links?: string[];
+    age?: string;
+    social_links?: {
+      platform?: string;
+      url?: string;
+    }[];
   };
 };
 // กำหนด type ของ profile
@@ -59,7 +64,7 @@ type Profile = {
   profile: {
     display_name: string;
     avatar?: string;
-    bio?: string;
+    age?: string;
     social_links?: SocialLink[];
   };
 };
@@ -68,10 +73,38 @@ type ProfileFrom = {
   mobile: string;
   profile: {
     display_name: string;
-    bio?: string;
+    age?: string;
     social_links: SocialLink[];
   };
 };
+type Password = {
+  password_old: string;
+  password_new: string;
+  password_confirm: string;
+};
+
+type PasswordError = {
+  password_old: string[];
+  password_new: string[];
+  password_confirm: string[];
+};
+
+type Email = {
+  email: string;
+};
+
+type EmailError = {
+  email: string | string[]; // รองรับข้อความเดียวหรือหลายข้อความ
+};
+
+const initialEmail: Email = {
+  email: "",
+};
+
+const initialEmailError: EmailError = {
+  email: "",
+};
+
 const initialProfile = {
   name: "",
   email: "",
@@ -79,19 +112,28 @@ const initialProfile = {
   profile: {
     display_name: "",
     avatar: "",
-    bio: "",
+    age: "",
     social_links: [],
   },
 };
-
 const initialProfileForm: ProfileFrom = {
   name: "",
   mobile: "",
   profile: {
     display_name: "",
-    bio: "",
+    age: "",
     social_links: [],
   },
+};
+const initialPassword: Password = {
+  password_old: "",
+  password_new: "",
+  password_confirm: "",
+};
+const initialPasswordError = {
+  password_old: [] as string[],
+  password_new: [] as string[],
+  password_confirm: [] as string[],
 };
 const initialErrorsProfile: ErrorsProfile = {
   name: "",
@@ -99,17 +141,18 @@ const initialErrorsProfile: ErrorsProfile = {
   profile: {
     display_name: "",
     avatar: "",
-    bio: "",
+    age: "",
     social_links: [],
   },
 };
+
 export default function () {
   const { user, loading: authLoading, setUser } = useAuth();
   const router = useRouter();
   const avatar = user?.profile?.avatar;
   const avatarSrc =
     avatar && (avatar.startsWith("http") ? avatar : `${API_URL}${avatar}`);
-  const [email, setEmail] = useState("");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [errorImage, setErrorImage] = useState<ErrorsImage>({});
@@ -125,11 +168,139 @@ export default function () {
   // ใช้กับ useState
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const fetchedRef = useRef(false);
+  const [newPassword, setNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showPasswords, setShowPasswords] = useState({
+    newPassword: false,
+    confirmPassword: false,
+    oldPassword: false,
+  });
+  const togglePassword = (field: keyof typeof showPasswords) => {
+    setShowPasswords((prev) => ({
+      ...prev,
+      [field]: !prev[field],
+    }));
+  };
+  const [passwordError, setPasswordError] =
+    useState<PasswordError>(initialPasswordError);
+  const [fromNewPassword, setFromNewPassword] =
+    useState<Password>(initialPassword);
+  const [formEmail, setFormEmail] = useState<Email>(initialEmail);
+  const [emailError, setEmailError] = useState<EmailError>(initialEmailError);
+  const [changingEmail, setChangingEmail] = useState(false);
+  const handleChangePassword = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFromNewPassword((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+
+    setPasswordError((prev) => ({
+      ...prev,
+      [id]: "",
+    }));
+  };
+  const changeEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailError(initialEmailError);
+    setChangingEmail(true);
+
+    try {
+      const res = await axios.post(
+        `${API_URL}/api/auth/request-change-email`,
+        formEmail,
+        { withCredentials: true },
+      );
+
+      Swal.fire({
+        title: "email updated 🎉",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      // ✅ clear form หลัง update สำเร็จ
+      setFormEmail(initialEmail);
+    } catch (error: any) {
+      const err = error.response?.data;
+
+      if (Array.isArray(err)) {
+        const fieldEmailError: EmailError = { ...initialEmailError };
+        err.forEach((e: { field: keyof EmailError; message: string }) => {
+          // ถ้าอยากเก็บหลายข้อความ → ใช้ array
+          fieldEmailError[e.field] = Array.isArray(fieldEmailError[e.field])
+            ? [...fieldEmailError[e.field], e.message]
+            : [e.message];
+        });
+        setEmailError(fieldEmailError);
+      } else {
+        setEmailError({
+          email: err?.message || "sending new email failed",
+        });
+      }
+    } finally {
+      setChangingEmail(false);
+    }
+  };
+  const handleChangeEmail = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormEmail((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+
+    setEmailError((prev) => ({
+      ...prev,
+      [id]: "",
+    }));
+  };
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(initialPasswordError);
+    setChangingPassword(true);
+    try {
+      const res = await axios.patch(
+        `${API_URL}/api/auth/update-password`,
+        fromNewPassword,
+        {
+          withCredentials: true,
+        },
+      );
+      setFromNewPassword(initialPassword);
+      Swal.fire({
+        title: "password updated 🎉",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      const err = error.response?.data;
+
+      if (Array.isArray(err?.errors)) {
+        const fieldPasswordError = structuredClone(initialPasswordError);
+        err.errors.forEach((e: { field: keyof Password; message: string }) => {
+          fieldPasswordError[e.field].push(e.message);
+        });
+        console.log(fieldPasswordError);
+        setPasswordError(fieldPasswordError);
+      } else {
+        setPasswordError({
+          password_new: [],
+          password_old: [],
+          password_confirm: [error.response?.data?.message || "update failed"],
+        });
+      }
+    } finally {
+      setChangingPassword(false);
+    }
+  };
   const handleChangeProfile = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { id, value } = e.target;
-    if (["display_name", "bio", "mobile"].includes(id)) {
+    if (["display_name", "age"].includes(id)) {
       setProfileForm((prev) => ({
         ...prev,
         profile: {
@@ -177,7 +348,7 @@ export default function () {
         name: data.name,
         profile: {
           avatar: data.profile?.avatar ?? "",
-          bio: data.profile?.bio ?? "",
+          age: data.profile?.age ?? "",
           display_name: data.profile?.display_name ?? "",
           social_links: data.profile?.social_links ?? [],
         },
@@ -186,7 +357,7 @@ export default function () {
         mobile: data.mobile,
         name: data.name,
         profile: {
-          bio: data.profile?.bio ?? "",
+          age: data.profile?.age ?? "",
           display_name: data.profile?.display_name ?? "",
           social_links: data.profile?.social_links ?? [],
         },
@@ -197,21 +368,6 @@ export default function () {
         error.response?.data || error.message,
       );
     }
-  };
-
-  const initialForm = {
-    email: "",
-    name: "",
-    mobile: "",
-    display_name: "",
-    social_links: "",
-    bio: "",
-  };
-
-  const initialPassword = {
-    new_password: "",
-    confirm_password: "",
-    password: "",
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,11 +442,11 @@ export default function () {
     const formDate = {
       mobile: profileForm.mobile,
       name: profileForm.name,
-      age: profileForm.profile.bio,
+      age: profileForm.profile.age,
       display_name: profileForm.profile.display_name,
       social_links: profileForm.profile.social_links,
     };
-    console.log(formDate);
+    // console.log(formDate);
 
     try {
       const res = await axios.put(
@@ -304,54 +460,80 @@ export default function () {
         },
       );
       const data = res.data.user;
-      console.log(res.data);
 
-      // setProfile({
-      //   email: data.email,
-      //   mobile: data.mobile,
-      //   name: data.name,
-      //   profile: {
-      //     avatar: data.profile?.avatar ?? "",
-      //     bio: data.profile?.bio ?? "",
-      //     display_name: data.profile?.display_name ?? "",
-      //     social_links: data.profile?.social_links ?? [],
-      //   },
-      // });
-      // setProfileForm({
-      //   mobile: data.mobile,
-      //   name: data.name,
-      //   profile: {
-      //     bio: data.profile?.bio ?? "",
-      //     display_name: data.profile?.display_name ?? "",
-      //     social_links: data.profile?.social_links ?? [],
-      //   },
-      // });
-      // Swal.fire({
-      //   title: "Profile updated 🎉",
-      //   icon: "success",
-      //   // timer: 1200,
-      //   showConfirmButton: false,
-      // });
+      setProfile((prev) => ({
+        ...prev, // ✅ เก็บ email และค่าเดิมไว้
+        mobile: data.mobile,
+        name: data.name,
+        profile: {
+          ...prev.profile, // ✅ เก็บ avatar ไว้
+          age: data.profile?.age ?? "",
+          display_name: data.profile?.display_name ?? "",
+          social_links: data.profile?.social_links ?? [],
+        },
+      }));
+      setProfileForm({
+        mobile: data.mobile,
+        name: data.name,
+        profile: {
+          age: data.profile?.age ?? "",
+          display_name: data.profile?.display_name ?? "",
+          social_links: data.profile?.social_links ?? [],
+        },
+      });
+      Swal.fire({
+        title: "Profile updated 🎉",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
     } catch (error: any) {
       const err = error.response?.data;
 
       if (Array.isArray(err?.errors)) {
-        const fieldErrorsProfile: ErrorsProfile = initialErrorsProfile;
+        const fieldErrorsProfile = structuredClone(initialErrorsProfile); // ✅ deep copy ปลอดภัย
 
         err.errors.forEach(
           (e: { field: keyof ErrorsProfile; message: string }) => {
-            fieldErrorsProfile[e.field] = e.message;
+            if (e.field.startsWith("social_links")) {
+              const [, indexStr, key] = e.field.split(".");
+              const index = Number(indexStr);
+              if (isNaN(index)) return;
+              // ✅ เช็ค undefined ก่อน
+              if (!fieldErrorsProfile.profile) {
+                fieldErrorsProfile.profile = { social_links: [] };
+              }
+
+              if (!fieldErrorsProfile.profile.social_links) {
+                fieldErrorsProfile.profile.social_links = [];
+              }
+
+              if (!fieldErrorsProfile.profile.social_links[index]) {
+                fieldErrorsProfile.profile.social_links[index] = {};
+              }
+
+              (fieldErrorsProfile.profile.social_links[index] as any)[key] =
+                e.message;
+            } else if (
+              e.field.startsWith("display_name") ||
+              e.field.startsWith("age")
+            ) {
+              fieldErrorsProfile.profile ??= {};
+              (fieldErrorsProfile.profile as any)[e.field] = e.message;
+            } else {
+              fieldErrorsProfile[e.field] = e.message;
+            }
           },
         );
 
-        setErrorsProfileForm(fieldErrorsProfile); // ✅ ใช้ตัวนี้
+        setErrorsProfileForm(fieldErrorsProfile);
       } else {
         Swal.fire({
           title: "Error",
           icon: "error",
-          // timer: 1500,
+          timer: 1500,
           showConfirmButton: false,
-          text: err?.message || "Something went wrong", // ✅ แก้ตรงนี้
+          text: err?.message || "Something went wrong",
         });
       }
     } finally {
@@ -363,7 +545,6 @@ export default function () {
     setModelProfileEdit(false);
     setModelPasswordEdit(false);
   };
-
   const handleEditPassword = () => {
     setModelPasswordEdit((prev) => !prev); // ✅ toggle
     setModelProfileEdit(false);
@@ -444,7 +625,7 @@ export default function () {
               </small>
             </div>
             <div>
-              <p>bio : {profile.profile.bio || "ไม่ระบุ"}</p>
+              <p>age : {profile.profile.age || "ไม่ระบุ"}</p>
               <small className="text-gray-500 text-xs">
                 เขียนคำอธิบายสั้น ๆ เกี่ยวกับตัวคุณ
               </small>
@@ -545,12 +726,18 @@ export default function () {
                   <Label htmlFor="name">name</Label>
                   <Input
                     id="name"
-                    // value={displayName}
-                    // onChange={(e) => setDisplayName(e.target.value)}
                     value={profileForm.name}
                     onChange={handleChangeProfile}
                     placeholder="Enter you name"
+                    className={`pl-10 ${errorsProfileForm.name && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
                   />
+                  {errorsProfileForm.name && (
+                    <div className="w-full text-red-500 text-sm mt-1">
+                      <span className="text-red-500 text-sm ">
+                        {errorsProfileForm.name}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="display_name">display name</Label>
@@ -559,16 +746,33 @@ export default function () {
                     value={profileForm.profile.display_name}
                     onChange={handleChangeProfile}
                     placeholder="Your display name"
+                    className={`pl-10 ${errorsProfileForm.profile.display_name && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
                   />
+                  {errorsProfileForm.profile.display_name && (
+                    <div className="w-full text-red-500 text-sm mt-1">
+                      <span className="text-red-500 text-sm ">
+                        {errorsProfileForm.profile.display_name}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bio">bio</Label>
+                  <Label htmlFor="age">age</Label>
                   <Input
-                    id="bio"
-                    value={profileForm.profile.bio}
+                    id="age"
+                    value={profileForm.profile.age}
                     onChange={handleChangeProfile}
-                    placeholder="Your bio "
+                    placeholder="Your age "
+                    className={`pl-10 ${errorsProfileForm.profile.age && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
                   />
+
+                  {errorsProfileForm.profile.age && (
+                    <div className="w-full text-red-500 text-sm mt-1">
+                      <span className="text-red-500 text-sm ">
+                        {errorsProfileForm.profile.age}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <div>
@@ -597,7 +801,7 @@ export default function () {
                   </div>
                   <Label htmlFor="displayName">social_links</Label>
                   {profileForm.profile.social_links.map((link, index) => (
-                    <div key={index} className="flex gap-2 mb-2">
+                    <div key={index} className="flex flex-wrap gap-2 mb-2">
                       {/* platform */}
                       <select
                         value={link.platform}
@@ -616,7 +820,7 @@ export default function () {
                           }));
                         }}
                         required
-                        className="border p-2 rounded  bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="basis-1/12 border p-2 rounded bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">-- Select Platform --</option>
                         <option value="youtube">YouTube</option>
@@ -643,9 +847,8 @@ export default function () {
                           }));
                         }}
                         placeholder="https://..."
-                        className="border p-2 flex-1 rounded"
+                        className={`pl-10 ${errorsProfileForm.profile.social_links?.[index]?.url && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"} basis-8/12 border p-2 rounded`}
                       />
-
                       {/* delete */}
                       <button
                         onClick={() => {
@@ -660,10 +863,18 @@ export default function () {
                           }));
                         }}
                         type="button"
-                        className="text-red-500"
+                        className="basis-1 text-red-500"
                       >
                         ลบ
                       </button>
+
+                      {errorsProfileForm.profile.social_links?.[index]?.url && (
+                        <div className="w-full text-red-500 text-sm mt-1">
+                          <span className="text-red-500 text-sm ">
+                            {errorsProfileForm.profile.social_links[index]?.url}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -674,7 +885,15 @@ export default function () {
                     value={profileForm.mobile}
                     onChange={handleChangeProfile}
                     placeholder="Your  mobile "
+                    className={`pl-10 ${errorsProfileForm.mobile && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
                   />
+                  {errorsProfileForm.mobile && (
+                    <div className="w-full text-red-500 text-sm mt-1">
+                      <span className="text-red-500 text-sm ">
+                        {errorsProfileForm.mobile}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <Button disabled={loadingProfile}>
@@ -702,54 +921,132 @@ export default function () {
               <CardDescription>Update your account password</CardDescription>
             </CardHeader>
             <CardContent>
-              <form
-                //   onSubmit={handleChangePassword}
-                className="space-y-4"
-              >
+              <form onSubmit={handleUpdatePassword} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
+                  <Label htmlFor="password_old">Old Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      id="newPassword"
-                      //  type={showPassword ? "text" : "password"}
-                      //   placeholder="Min 6 characters" value={newPassword}
-                      //   onChange={e => setNewPassword(e.target.value)}
-                      className="pl-10 pr-10"
+                      id="password_old"
+                      type={showPasswords.oldPassword ? "text" : "password"}
+                      placeholder="Min 6 characters"
+                      value={fromNewPassword.password_old}
+                      onChange={handleChangePassword}
+                      className={`pl-10 pr-10 ${
+                        Array.isArray(passwordError.password_old) &&
+                        passwordError.password_old.length > 0
+                          ? "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                          : ""
+                      }`}
                       required
                       minLength={6}
                     />
+
                     <button
                       type="button"
-                      //  onClick={() => setShowPassword(!showPassword)}
+                      onClick={() => togglePassword("oldPassword")}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
-                      {/* {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />} */}
+                      {showPasswords.oldPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
+                  {Array.isArray(passwordError.password_old) &&
+                    passwordError.password_old.map((err, i) => (
+                      <p key={i} className="text-red-500 text-sm">
+                        {err}
+                      </p>
+                    ))}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirmNewPassword">Confirm Password</Label>
+                  <Label htmlFor="password_new">New Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      id="confirmNewPassword"
-                      // type={showPassword ? "text" : "password"}
-                      //  placeholder="Repeat password" value={confirmPassword}
-                      //  onChange={e => setConfirmPassword(e.target.value)}
-                      className="pl-10"
+                      id="password_new"
+                      type={showPasswords.newPassword ? "text" : "password"}
+                      placeholder="Repeat New password"
+                      value={fromNewPassword.password_new}
+                      onChange={handleChangePassword}
+                      className={`pl-10 pr-10 ${
+                        Array.isArray(passwordError.password_new) &&
+                        passwordError.password_new.length > 0
+                          ? "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                          : ""
+                      }`}
                       required
                       minLength={6}
                     />
+
+                    <button
+                      type="button"
+                      onClick={() => togglePassword("newPassword")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPasswords.newPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
                   </div>
+                  {Array.isArray(passwordError.password_new) &&
+                    passwordError.password_new.map((err, i) => (
+                      <p key={i} className="text-red-500 text-sm">
+                        {err}
+                      </p>
+                    ))}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password_confirm">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="password_confirm"
+                      type={showPasswords.confirmPassword ? "text" : "password"}
+                      placeholder="Repeat password confirm"
+                      value={fromNewPassword.password_confirm}
+                      onChange={handleChangePassword}
+                      className={`pl-10 pr-10 ${
+                        Array.isArray(passwordError.password_confirm) &&
+                        passwordError.password_confirm.length > 0
+                          ? "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                          : ""
+                      }`}
+                      required
+                      minLength={6}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => togglePassword("confirmPassword")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPasswords.confirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+
+                  {Array.isArray(passwordError.password_confirm) &&
+                    passwordError.password_confirm.map((err, i) => (
+                      <p key={i} className="text-red-500 text-sm">
+                        {err}
+                      </p>
+                    ))}
                 </div>
                 <Button
                   type="submit"
                   variant="outline"
-                  // disabled={changingPassword}
+                  disabled={changingPassword}
                 >
                   <Lock className="mr-1.5 h-4 w-4" />
-                  {/* {changingPassword ? "Changing..." : "Change Password"} */}
+                  {changingPassword ? "Changing..." : "Change Password"}
                 </Button>
               </form>
             </CardContent>
@@ -771,54 +1068,36 @@ export default function () {
               <CardDescription>Update your account password</CardDescription>
             </CardHeader>
             <CardContent>
-              <form
-                //   onSubmit={handleChangePassword}
-                className="space-y-4"
-              >
+              <form onSubmit={changeEmail} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
+                  <Label htmlFor="email">new email</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      id="newPassword"
-                      //  type={showPassword ? "text" : "password"}
-                      //   placeholder="Min 6 characters" value={newPassword}
-                      //   onChange={e => setNewPassword(e.target.value)}
-                      className="pl-10 pr-10"
+                      id="email"
+                      type={"email"}
+                      placeholder="send new email"
+                      value={formEmail.email}
+                      onChange={handleChangeEmail}
+                      className={`pl-10 ${emailError.email && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
                       required
-                      minLength={6}
                     />
-                    <button
-                      type="button"
-                      //  onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {/* {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />} */}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmNewPassword">Confirm Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="confirmNewPassword"
-                      // type={showPassword ? "text" : "password"}
-                      //  placeholder="Repeat password" value={confirmPassword}
-                      //  onChange={e => setConfirmPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                      minLength={6}
-                    />
+                    {emailError && (
+                      <div className="w-full text-red-500 text-sm mt-1">
+                        <span className="text-red-500 text-sm ">
+                          {emailError.email}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <Button
                   type="submit"
                   variant="outline"
-                  // disabled={changingPassword}
+                  disabled={changingEmail}
                 >
-                  <Lock className="mr-1.5 h-4 w-4" />
-                  {/* {changingPassword ? "Changing..." : "Change Password"} */}
+                  <Mail className="mr-1.5 h-4 w-4" />
+                  {changingEmail ? "sending..." : "send new email"}
                 </Button>
               </form>
             </CardContent>

@@ -5,6 +5,7 @@ import { IResetToken } from "../types/resetToken";
 const ResetTokenSchema = new Schema<IResetToken>({
   user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
   token: { type: String, required: true, unique: true },
+  contact: { type: String, required: false, unique: false },
   expiresAt: { type: Date, required: true },
 });
 

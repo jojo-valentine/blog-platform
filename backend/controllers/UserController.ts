@@ -22,7 +22,7 @@ class UserController {
         .populate({
           path: "profile",
           // match: { deletedAt: null },
-          select: "user_id display_name bio avatar social_links",
+          select: "user_id display_name age avatar social_links",
         });
       if (!user) {
         return res.status(404).json({
@@ -143,18 +143,28 @@ class UserController {
         // update user
         await user?.updateOne({ $set: { name, mobile } }, { session });
 
-        // update profile
-        result = await Profile.updateOne(
+        // ✅ ใช้ findOneAndUpdate แทน updateOne เพื่อได้ข้อมูลกลับมา
+        const updatedProfile = await Profile.findOneAndUpdate(
           { user_id: userId },
-          { $set: { display_name, bio: age, social_links: social_links } },
-          { session },
+          { $set: { display_name, age, social_links } },
+          { session, new: true }, // new: true = ส่งข้อมูลหลัง update
         );
+
+        result = {
+          name,
+          mobile,
+          profile: {
+            display_name: updatedProfile?.display_name,
+            age: updatedProfile?.age,
+            social_links: updatedProfile?.social_links,
+          },
+        };
       });
 
       // ถ้า transaction สำเร็จ → commit อัตโนมัติ
       return res.status(200).json({
         message: "successfully data update",
-        data: result,
+        user: result,
       });
     } catch (err: unknown) {
       const error = err as Error;

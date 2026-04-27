@@ -63,9 +63,9 @@ router.post(
   AuthController.requestChangeEmail,
 );
 // confirm-change-email
-router.put(
+router.patch(
   "/confirm-change-email",
-  authMiddleware,
+  // authMiddleware,
   useValidation({ body: authSchemas.update_new_email }),
   AuthController.changeEmail,
 );

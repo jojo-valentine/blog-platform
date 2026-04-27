@@ -440,7 +440,7 @@ class AuthController {
       res.clearCookie("accessToken", cookieOptions);
       res.clearCookie("refreshToken", cookieOptions);
 
-      return res.status(200).json({ message: "Logged out successfury" });
+      return res.status(200).json({ message: "Logged out successfully" });
     } catch (err: any) {
       return res.status(500).json({
         message: "Something went wrong",
@@ -449,8 +449,8 @@ class AuthController {
   }
   static async updateNewPassword(req: Request, res: Response) {
     // oldPassword newpassword
-    const { password, newPassword, confirmNewPassword } = req.body;
-    console.log(password, newPassword, confirmNewPassword, req.user);
+    const { password_old, password_new, password_confirm } = req.body;
+    console.log(password_old, password_new, password_confirm, req.user);
 
     if (!req.user?.userId) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -462,157 +462,117 @@ class AuthController {
         const user = await User.findById(req.user?.userId).session(session); // ✅ ใช้ session
         if (!user) throw new Error("User not found"); // ✅ throw แทน return res
 
-        const isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(password_old, user.password);
         if (!isMatch) throw new Error("Old password is incorrect"); // ✅ throw แทน return res
 
-        user.password = await bcrypt.hash(newPassword, 10);
+        const isMatchNewPassword = password_new === password_confirm;
+        if (!isMatchNewPassword) {
+          throw new Error("New passwords do not match");
+        }
+
+        user.password = await bcrypt.hash(password_new, 10);
         await user.save({ session }); // ✅ ใช้ session
       });
       return res.status(200).json({
-        message: "successfury update",
+        message: "successfully update",
       });
-    } catch (err: any) {
-      if (err.message === "User not found") {
-        return res.status(404).json({ message: "User not found" });
-      }
-      if (err.message === "Old password is incorrect") {
-        return res.status(400).json({ message: "Old password is incorrect" });
-      }
-      return res.status(500).json({ message: "Something went wrong" });
+    } catch (error: unknown) {
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Server error",
+      });
     } finally {
       session.endSession();
     }
   }
   static async requestChangeEmail(req: Request, res: Response) {
     const { email } = req.body;
-
     const session = await mongoose.startSession();
+
     try {
       if (!req.user) {
-        return res.status(401).json({
-          message: "Unauthorized",
-        });
+        return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // หลังจากนี้ TS จะรู้ว่าไม่ undefined
       const userId = req.user.userId;
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({
-          message: "Email already in use, please use another email",
-        });
-      }
 
-      let token: string = "";
-      let otpCode: string = "";
+      let rawToken: string;
+
+      // ✅ ทำเฉพาะ DB ใน transaction
       await session.withTransaction(async () => {
-        const otp = otpService.generateOTP();
-        otpCode = otp;
-        await otpService.createOtp(
-          {
-            contact: email,
-            otp,
-            type: "request_new_email",
-          },
-          { session },
-        );
-        // ❗ 2. send email (ถ้า error → rollback)
-        // await emailService.verifyConnection();
-        // await emailService.sendOtpEmail(email, otp);
+        const existingUser = await User.findOne({ email }).session(session);
+        if (existingUser) {
+          throw new Error("Email already in use");
+        }
 
-        // 🔥 4. generate token
-        token = jwt.sign(
-          {
-            email,
-            type: "request_new_email",
-            userId: userId,
-          },
-          process.env.JWT_SECRET as string,
-          { expiresIn: "30m" },
+        rawToken = await tokenServices.generateTokenNewEmail(
+          userId.toString(),
+          session,
+          email,
         );
       });
 
-      // ✅ ส่งใน cookie แทน
-      res.cookie("changeEmailToken", token, {
-        httpOnly: true,
-        secure: false, // dev
-        sameSite: "lax" as const,
-        maxAge: 30 * 60 * 1000, // 30 นาที
-      });
+      // ✅ ออกจาก transaction แล้วค่อยส่ง email
+      const link = `${process.env.CLIENT_URL}/pages/confirm-change-email?token=${rawToken!}`;
+
+      await emailService.verifyConnection();
+      await emailService.senNewEmail(email, link);
 
       return res.status(200).json({
-        message: "OTP sent successfully",
-        change_email_token: token,
-        otp: otpCode,
+        message: "Send new email successfully",
       });
     } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.message === "Email already in use") {
+          return res.status(400).json({ message: err.message });
+        }
+      }
+
       return res.status(500).json({
         message: "Server error",
-        error: err instanceof Error ? err.message : "Unknown error",
       });
     } finally {
       session.endSession();
     }
   }
   static async changeEmail(req: Request, res: Response) {
-    const { otp } = req.body;
-    const token = req.cookies?.changeEmailToken;
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const session = await mongoose.startSession();
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-        userId: string;
-        email: string;
-        type: string;
-      };
-
-      const record = await Otp.findOne({
-        contact: decoded.email,
-        type: "request_new_email",
-      }).sort({ createdAt: -1 });
-
-      if (!record) {
-        return res.status(400).json({
-          message: "OTP not found",
-        });
-      }
-      // 🔥 3. เช็คหมดอายุ
-      if (record.expiresAt < new Date()) {
-        return res.status(400).json({
-          message: "OTP expired",
-        });
-      }
-      // 🔥 4. เช็คว่าใช้ไปแล้ว
-      if (record.verifyAt) {
-        return res.status(400).json({
-          message: "OTP already used",
-        });
-      }
-      // 🔥 5. compare OTP
-      const isValid = await bcrypt.compare(otp, record.otpHash);
-
-      if (!isValid) {
-        return res.status(400).json({
-          message: "Invalid OTP",
-        });
-      }
-      const user = await User.findById(decoded.userId);
-      if (!user) {
-        return res.status(404).json({
-          message: "not found data",
-        });
-      }
       await session.withTransaction(async () => {
-        record.verifyAt = new Date();
-        await record.save({ session });
-        // await record.
-        await user.updateOne({ email: decoded.email }, { session });
+        const { token } = req.body;
+        // const token = req.cookies?.changeEmailToken;
+        if (!token) {
+          throw new Error("Unauthorized");
+        }
+
+        const hashedToken = crypto
+          .createHash("sha256")
+          .update(token)
+          .digest("hex");
+        const resetToken = await ResetToken.findOne({
+          token: hashedToken,
+        }).session(session);
+        if (!resetToken || resetToken.expiresAt < new Date()) {
+          // return res.status(400).json({ valid: false, message: "Token expired" });
+          throw new Error("Invalid or expired token");
+        }
+
+        const user = await User.findById(resetToken.user_id).session(session);
+        if (!user) {
+          throw new Error("not found user");
+        }
+        const existing = await User.findOne({
+          email: resetToken.contact,
+          _id: { $ne: user._id }, // 👈 ยกเว้นตัวเอง
+        }).session(session);
+        if (existing) {
+          throw new Error("Email already in use");
+        }
+        user.email = resetToken.contact;
+        await user.save({ session });
+
+        // 🔥 ลบ token กัน reuse
+        await ResetToken.deleteOne({ _id: resetToken._id }).session(session);
       });
-      // ✅ clear cookie หลัง success
-      res.clearCookie("changeEmailToken");
 
       return res.status(200).json({
         message: "successfury update email",

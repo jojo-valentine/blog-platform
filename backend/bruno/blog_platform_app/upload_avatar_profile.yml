@@ -22,7 +22,7 @@ runtime:
     - name: display_name
       value: ""
       disabled: true
-    - name: bio
+    - name: age
       value: ""
       disabled: true
     - name: avatar

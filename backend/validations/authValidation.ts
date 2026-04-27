@@ -73,6 +73,7 @@ const fields = {
     .refine((val) => /[@$!%*?&]/.test(val), {
       message: "Password must include a special character (@$!%*?&)",
     }),
+  token: z.string().length(64, "Invalid token format"), // sha256 = 64 chars
 };
 
 export const authSchemas = {
@@ -101,16 +102,16 @@ export const authSchemas = {
   }),
   update_new_password: z
     .object({
-      password: fields.password,
-      newPassword: fields.newPassword,
-      confirmNewPassword: fields.confirmNewPassword,
+      password_old: fields.password,
+      password_new: fields.newPassword,
+      password_confirm: fields.confirmNewPassword,
     })
-    .refine((data) => data.newPassword === data.confirmNewPassword, {
+    .refine((data) => data.password_new === data.password_confirm, {
       message: "Passwords do not match",
-      path: ["confirmNewPassword"],
+      path: ["password_confirm"],
     }),
   update_new_email: z.object({
-    otp: z.string().min(1, "OTP is required").max(6, "OTP MAX 6 "),
+    token: fields.token.min(1, "Token is required"),
   }),
 };
 

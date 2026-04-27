@@ -7,6 +7,7 @@ import { ClientSession } from "mongoose";
 const ACCESS_SECRET = process.env.JWT_SECRET!;
 const ACCESS_EXPIRES = "15m";
 const REFRESH_EXPIRES_DAYS = 7;
+const NEW_EMAIL_EXPIRES = "15m";
 
 const tokenServices = {
   generateAccessToken(userId: string) {
@@ -58,6 +59,36 @@ const tokenServices = {
 
   async revokeRefreshToken(token: string) {
     await ResetToken.deleteOne({ token });
+  },
+
+  async generateTokenNewEmail(
+    userId: string,
+    session?: ClientSession,
+    contact?: string,
+  ) {
+    const rawToken = crypto.randomBytes(32).toString("hex"); // ✅ 64 chars
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    // const expiresAt = new Date();
+    // expiresAt.setDate(expiresAt.getDate() + NEW_EMAIL_EXPIRES);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await ResetToken.create(
+      [
+        {
+          user_id: userId,
+          token: hashedToken,
+          contact: contact,
+          expiresAt,
+        },
+      ],
+      { session },
+    );
+
+    return rawToken;
   },
 };
 export default tokenServices;
