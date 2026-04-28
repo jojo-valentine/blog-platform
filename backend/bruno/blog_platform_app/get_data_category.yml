@@ -1,0 +1,25 @@
+info:
+  name: get_data_category
+  type: http
+  seq: 25
+
+http:
+  method: GET
+  url: "{{base_url}}/api/category/image-category"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar("jwt_token", res.body.accessToken);
+        bru.setVar("userId", res.body.payload.id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

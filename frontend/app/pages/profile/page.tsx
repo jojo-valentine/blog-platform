@@ -28,6 +28,8 @@ import {
   PenLine,
   Mail,
   Form,
+  User,
+  Smartphone,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -724,13 +726,16 @@ export default function () {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">name</Label>
-                  <Input
-                    id="name"
-                    value={profileForm.name}
-                    onChange={handleChangeProfile}
-                    placeholder="Enter you name"
-                    className={`pl-10 ${errorsProfileForm.name && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
-                  />
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="name"
+                      value={profileForm.name}
+                      onChange={handleChangeProfile}
+                      placeholder="Enter you name"
+                      className={`pl-10 ${errorsProfileForm.name && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
+                    />
+                  </div>
                   {errorsProfileForm.name && (
                     <div className="w-full text-red-500 text-sm mt-1">
                       <span className="text-red-500 text-sm ">
@@ -741,13 +746,16 @@ export default function () {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="display_name">display name</Label>
-                  <Input
-                    id="display_name"
-                    value={profileForm.profile.display_name}
-                    onChange={handleChangeProfile}
-                    placeholder="Your display name"
-                    className={`pl-10 ${errorsProfileForm.profile.display_name && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
-                  />
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="display_name"
+                      value={profileForm.profile.display_name}
+                      onChange={handleChangeProfile}
+                      placeholder="Your display name"
+                      className={`pl-10 ${errorsProfileForm.profile.display_name && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
+                    />
+                  </div>
                   {errorsProfileForm.profile.display_name && (
                     <div className="w-full text-red-500 text-sm mt-1">
                       <span className="text-red-500 text-sm ">
@@ -758,14 +766,16 @@ export default function () {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="age">age</Label>
-                  <Input
-                    id="age"
-                    value={profileForm.profile.age}
-                    onChange={handleChangeProfile}
-                    placeholder="Your age "
-                    className={`pl-10 ${errorsProfileForm.profile.age && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
-                  />
-
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="age"
+                      value={profileForm.profile.age}
+                      onChange={handleChangeProfile}
+                      placeholder="Your age "
+                      className={`pl-10 ${errorsProfileForm.profile.age && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
+                    />
+                  </div>
                   {errorsProfileForm.profile.age && (
                     <div className="w-full text-red-500 text-sm mt-1">
                       <span className="text-red-500 text-sm ">
@@ -880,13 +890,16 @@ export default function () {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="displayName">mobile</Label>
-                  <Input
-                    id="mobile"
-                    value={profileForm.mobile}
-                    onChange={handleChangeProfile}
-                    placeholder="Your  mobile "
-                    className={`pl-10 ${errorsProfileForm.mobile && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
-                  />
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="mobile"
+                      value={profileForm.mobile}
+                      onChange={handleChangeProfile}
+                      placeholder="Your  mobile "
+                      className={`pl-10 ${errorsProfileForm.mobile && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"}`}
+                    />
+                  </div>
                   {errorsProfileForm.mobile && (
                     <div className="w-full text-red-500 text-sm mt-1">
                       <span className="text-red-500 text-sm ">

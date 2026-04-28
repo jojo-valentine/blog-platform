@@ -1,5 +1,6 @@
 import { User, Profile } from "../models";
-
+import dotenv from "dotenv";
+import connectDB from "../config/db";
 async function seedProfile() {
   const nameRandom = [
     "jim",
@@ -54,3 +55,17 @@ async function seedProfile() {
 }
 
 export default seedProfile;
+dotenv.config(); // ✅ โหลด env ก่อน
+async function runSeeds() {
+  try {
+    await connectDB(); // ✅ สำคัญที่สุด (ตัวแก้ปัญหา)
+    await seedProfile();
+    console.log("🌱 All seeds completed successfully");
+    process.exit();
+  } catch (error) {
+    console.error("❌ Seeding failed:", error);
+    process.exit(1);
+  }
+}
+
+runSeeds();

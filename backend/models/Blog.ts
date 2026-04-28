@@ -7,7 +7,7 @@ const BlogSchema = new Schema<IBlog>(
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
     title: { type: String, required: true },
     content: { type: String, required: true },
-    tags: [String],
+    tags_id: [{ type: Schema.Types.ObjectId, ref: "ImageCategory" }],
     coverImage: [String],
     online: { type: Boolean, default: false },
     suspended: { type: Boolean, default: false },

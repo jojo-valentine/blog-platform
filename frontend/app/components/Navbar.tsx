@@ -38,6 +38,9 @@ export default function Navbar() {
     });
     setUser(null);
   };
+  const avatar = user?.profile?.avatar;
+  const avatarSrc =
+    avatar && (avatar.startsWith("http") ? avatar : `${API_URL}${avatar}`);
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
       <div className="container flex h-16 items-center justify-between">
@@ -59,7 +62,7 @@ export default function Navbar() {
                 </Link>
               </Button>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="">
+                <Link href="/pages/blog/">
                   <BookOpen className="mr-1.5 h-4 w-4" />
                   My Blogs
                 </Link>
@@ -69,7 +72,12 @@ export default function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.profile?.avatar ?? undefined} />
+                      <AvatarImage
+                        src={avatarSrc}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
                       <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                         {(user?.profile?.display_name ?? user.email ?? "U")
                           .charAt(0)
@@ -79,7 +87,9 @@ export default function Navbar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => router.push("/pages/profile")}>
+                  <DropdownMenuItem
+                    onClick={() => router.push("/pages/profile")}
+                  >
                     <User className="mr-2 h-4 w-4" /> Profile
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

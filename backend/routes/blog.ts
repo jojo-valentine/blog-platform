@@ -33,4 +33,5 @@ router.patch(
   BlogController.blogTogglePost,
 );
 router.delete("/:id/delete", authMiddleware, BlogController.blogDeletePost);
+
 export default router;

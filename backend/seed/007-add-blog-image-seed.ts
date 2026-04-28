@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 import { Blog, ImageBlog } from "../models";
 import { IImageBlog } from "../types";
+import dotenv from "dotenv";
+import connectDB from "../config/db";
+
 async function seedImageBlog() {
   try {
     console.log("🌱 Seeding image blogs...");
@@ -42,3 +45,17 @@ async function seedImageBlog() {
 }
 
 export default seedImageBlog;
+dotenv.config(); // ✅ โหลด env ก่อน
+async function runSeeds() {
+  try {
+    await connectDB(); // ✅ สำคัญที่สุด (ตัวแก้ปัญหา)
+    await seedImageBlog();
+    console.log("🌱 All seeds completed successfully");
+    process.exit();
+  } catch (error) {
+    console.error("❌ Seeding failed:", error);
+    process.exit(1);
+  }
+}
+
+runSeeds();

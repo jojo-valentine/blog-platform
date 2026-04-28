@@ -139,36 +139,36 @@ class BlogController {
 
       await session.withTransaction(async () => {
         // ✅ 1. create blog
-        const [blog] = await Blog.create(
-          [
-            {
-              _id: blogId,
-              user_id: user.userId,
-              title,
-              content,
-              tags: parseTags(tags),
-              online: online === true || online === "true",
-              suspended: false,
-              coverImage: coverImage?.path,
-            },
-          ],
-          { session },
-        );
+        // const [blog] = await Blog.create(
+        //   [
+        //     {
+        //       _id: blogId,
+        //       user_id: user.userId,
+        //       title,
+        //       content,
+        //       tags: parseTags(tags),
+        //       online: online === true || online === "true",
+        //       suspended: false,
+        //       coverImage: coverImage?.path,
+        //     },
+        //   ],
+        //   { session },
+        // );
         // ✅ 2. create images
         type ImageDoc = HydratedDocument<IImageBlog>;
         let createdImages: IImageBlog[] = [];
 
-        if (images.length > 0) {
-          createdImages = await ImageBlog.insertMany(
-            images.map((img) => ({
-              blog_id: blog._id,
-              path: img.path,
-              // image: img.filename,
-              uploadedBy: user.userId,
-            })),
-            { session },
-          );
-        }
+        // if (images.length > 0) {
+        //   createdImages = await ImageBlog.insertMany(
+        //     images.map((img) => ({
+        //       blog_id: blog._id,
+        //       path: img.path,
+        //       // image: img.filename,
+        //       uploadedBy: user.userId,
+        //     })),
+        //     { session },
+        //   );
+        // }
 
         // ✅ 3. link image → blog (ถ้าคุณมี field images)
         // if (createdImages.length > 0) {
@@ -176,7 +176,7 @@ class BlogController {
         //   await blog.save({ session });
         // }
 
-        newBlog = blog;
+        // newBlog = blog;
       });
       return res.status(201).json({
         message: "Blog created successfully",
@@ -321,23 +321,23 @@ class BlogController {
 
           return []; // default fallback
         };
-        const oldTags = parseTags(blogPost.tags ?? "");
-        const newTags = parseTags(req.body.tags ?? "");
-        let mergedTags: string[] = [];
-        // 2. เทียบว่ามีการเปลี่ยนแปลงหรือไม่
-        const isChanged =
-          oldTags.length !== newTags.length ||
-          oldTags.some((tag) => !newTags.includes(tag));
-        if (isChanged) {
-          // // 3. หา tag ที่เพิ่มเข้ามา
-          const addedTags = newTags.filter((tag) => !oldTags.includes(tag));
-          // ✅ merge แล้ว dedup ด้วย Set
-          // const mergedTags = [...new Set([...oldTags, ...newTags])];
-          const oldTagsSet = new Set(oldTags);
-          addedTags.forEach((tag) => oldTagsSet.add(tag));
-          mergedTags = Array.from(oldTagsSet);
-          // console.log(mergedTags);
-        }
+        // const oldTags = parseTags(blogPost.tags ?? "");
+        // const newTags = parseTags(req.body.tags ?? "");
+        // let mergedTags: string[] = [];
+        // // 2. เทียบว่ามีการเปลี่ยนแปลงหรือไม่
+        // const isChanged =
+        //   oldTags.length !== newTags.length ||
+        //   oldTags.some((tag) => !newTags.includes(tag));
+        // if (isChanged) {
+        //   // // 3. หา tag ที่เพิ่มเข้ามา
+        //   const addedTags = newTags.filter((tag) => !oldTags.includes(tag));
+        //   // ✅ merge แล้ว dedup ด้วย Set
+        //   // const mergedTags = [...new Set([...oldTags, ...newTags])];
+        //   const oldTagsSet = new Set(oldTags);
+        //   addedTags.forEach((tag) => oldTagsSet.add(tag));
+        //   mergedTags = Array.from(oldTagsSet);
+        //   // console.log(mergedTags);
+        // }
 
         let oldCoverImage: string = "";
         let newCoverImage: string = "";
@@ -363,7 +363,7 @@ class BlogController {
           {
             title,
             content,
-            tags: isChanged ? mergedTags : oldTags,
+            // tags: isChanged ? mergedTags : oldTags,
             online: online === true || online === "true",
             coverImage: newCoverImage || oldCoverImage,
           },

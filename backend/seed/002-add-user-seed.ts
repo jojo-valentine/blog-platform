@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import { User } from "../models/User";
-
+import dotenv from "dotenv";
+import connectDB from "../config/db";
 const seedUsers = [
   {
     name: "Alice Admin",
@@ -44,3 +45,17 @@ async function seedUser() {
 }
 
 export default seedUser;
+dotenv.config(); // ✅ โหลด env ก่อน
+async function runSeeds() {
+  try {
+    await connectDB(); // ✅ สำคัญที่สุด (ตัวแก้ปัญหา)
+    await seedUser();
+    console.log("🌱 All seeds completed successfully");
+    process.exit();
+  } catch (error) {
+    console.error("❌ Seeding failed:", error);
+    process.exit(1);
+  }
+}
+
+runSeeds();
