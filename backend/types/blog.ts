@@ -1,5 +1,6 @@
-import mongoose, { Document } from "mongoose";
+import mongoose, { Document, Types } from "mongoose";
 export interface IBlog extends Document {
+
   user_id: mongoose.Types.ObjectId;
   title: string;
   content: string;

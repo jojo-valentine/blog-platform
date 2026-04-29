@@ -4,7 +4,7 @@ import { z } from "zod";
 const fields = {
   title: z.string().min(1, "Title is required"),
   content: z.string().min(1, "Content is required"),
-  tags: z // ✅ parse JSON string → array
+  categories: z
     .string()
     .optional()
     .transform((val) => {
@@ -15,7 +15,7 @@ const fields = {
         return [];
       }
     })
-    .pipe(z.array(z.string()).optional()),
+    .pipe(z.array(z.string())),
   online: z // ✅ coerce string "true"/"false" → boolean
     .enum(["true", "false"])
     .optional()
@@ -26,14 +26,14 @@ export const blogSchemas = {
   create: z.object({
     title: fields.title,
     content: fields.content,
-    tags: fields.tags,
-    online: fields.online,
+    categories: z.array(z.string()).optional(),
+    // online: fields.online,
   }),
 
   update: z.object({
     title: fields.title.optional(),
     content: fields.content.optional(),
-    tags: fields.tags,
+    categories: fields.categories,
     online: fields.online,
   }),
 

@@ -28,51 +28,64 @@ import Link from "next/link";
 import axios from "axios";
 import { API_URL } from "@/app/lib/config";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import "react-quill-new/dist/quill.snow.css";
+import Swal from "sweetalert2";
 
+const QuillEditor = dynamic(() => import("react-quill-new"), {
+  ssr: false,
+});
+type ImageItem = {
+  file: File;
+  preview: string;
+};
 type Blog = {
-  mainImage: File | null;
+  main_image: File | null;
   title: string;
   categories: string[];
   content: string;
-  coverImage: { file: File; preview: string }[];
+  gallery: ImageItem[];
 };
 
 type errorBlog = {
-  mainImage: File | null;
-  title: string;
-  categories: string[];
-  content: string;
-  coverImage: { file: File; preview: string }[];
+  main_image: string; // error message ของ main_image
+  title: string; // error message ของ title
+  categories: string; // error message ของ categories
+  content: string; // error message ของ content
+  gallery: string[]; // error message ของ gallery
 };
 
 const initialBlog: Blog = {
-  mainImage: null,
+  main_image: null,
   title: "",
   categories: [] as string[],
   content: "",
-  coverImage: [],
+  gallery: [],
 };
 
 const initialBlogError: errorBlog = {
-  mainImage: null,
+  main_image: "",
   title: "",
-  categories: [] as string[],
+  categories: "",
   content: "",
-  coverImage: [],
+  gallery: [],
 };
 
 type Category = {
   _id: string;
   name: string;
 };
+const MAX_IMAGES = 5; // จำนวนสูงสุดที่อนุญาต
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]; // ประเภทไฟล์ที่อนุญาต
+const MAX_SIZE = 5 * 1024 * 1024;
 export default function Page() {
   const { user, loading: loadingAuth } = useAuth();
   const router = useRouter();
   const mainImageRef = useRef<HTMLInputElement>(null);
   const imagesRef = useRef<HTMLInputElement>(null);
-
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategory, setLoadingCategory] = useState(false);
+  const [loadingBlog, setLoadingBlog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorBlog, setErrorBlog] = useState<errorBlog>(initialBlogError);
   const [mainImagePreview, setMainImagePreview] = useState<string | null>(null);
@@ -112,23 +125,58 @@ export default function Page() {
   const handleMainImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // เช็ค type
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setErrorBlog((prev) => ({
+        ...prev,
+        main_image: "ไฟล์ต้องเป็น JPG, PNG หรือ WEBP เท่านั้น",
+      }));
+      alert("ไฟล์ต้องเป็น JPG, PNG หรือ WEBP เท่านั้น");
+      return;
+    }
+    // เช็คขนาดไฟล์
+    if (file.size > MAX_SIZE) {
+      setErrorBlog((prev) => ({
+        ...prev,
+        main_image: "ไฟล์ต้องไม่เกิน 5MB",
+      }));
+      alert("ไฟล์ต้องไม่เกิน 5MB");
+      return;
+    }
     setBlogForm((prev) => ({
       ...prev,
-      mainImage: file,
+      main_image: file,
     }));
     // setMainImageFile(file);
     setMainImagePreview(URL.createObjectURL(file));
   };
   const handleAdditionalImages = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
+
+    // filter เฉพาะไฟล์ที่ type และ size ถูกต้อง
+    const validFiles = files.filter(
+      (file) => ALLOWED_TYPES.includes(file.type) && file.size <= MAX_SIZE,
+    );
+
+    // เช็คจำนวนรวม (ของเดิม + ใหม่)
+    if (blogForm.gallery.length + validFiles.length > MAX_IMAGES) {
+      setErrorBlog((prev) => ({
+        ...prev,
+        gallery: [`อัปโหลดได้สูงสุด ${MAX_IMAGES} รูป`],
+      }));
+      alert(`อัปโหลดได้สูงสุด ${MAX_IMAGES} รูป`);
+      return;
+    }
+
     const newImages = files.map((file) => ({
       file,
       preview: URL.createObjectURL(file),
     }));
     setBlogForm((prev) => ({
       ...prev,
-      coverImage: [...prev.coverImage, ...newImages],
+      gallery: [...prev.gallery, ...newImages],
     }));
+
     // setAdditionalImages((prev) => [...prev, ...newImages]);
   };
 
@@ -136,7 +184,7 @@ export default function Page() {
     // setAdditionalImages((prev) => prev.filter((_, i) => i !== index));
     setBlogForm((prev) => ({
       ...prev,
-      coverImage: prev.coverImage.filter((_, i) => i !== index),
+      gallery: prev.gallery.filter((_, i) => i !== index),
     }));
   };
   const handleChange = (
@@ -163,16 +211,93 @@ export default function Page() {
 
     setErrorBlog((prev) => ({ ...prev, [id]: "" }));
   };
-  // const uploadImage = async (file: File, path: string) => {
-  //   const { error } = await supabase.storage
-  //     .from("blog-images")
-  //     .upload(path, file, { upsert: true });
-  //   if (error) throw error;
-  //   return supabase.storage.from("blog-images").getPublicUrl(path).data
-  //     .publicUrl;
-  // };
-  if (loading) return <p>Loading...</p>;
 
+  const handleSubmitBlogFrom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // console.log({ blogForm: blogForm });
+    setLoadingCategory(true);
+    setErrorBlog(initialBlogError);
+    try {
+      const formData = new FormData();
+
+      // append mainImage (ไฟล์)
+      if (blogForm.main_image) {
+        formData.append("main_image", blogForm.main_image);
+      }
+
+      // append title, content
+      formData.append("title", blogForm.title);
+      formData.append("content", blogForm.content);
+
+      // append categories/tags
+      blogForm.categories.forEach((tag) => {
+        formData.append("categories", tag);
+      });
+      // append gallery (nested)
+      blogForm.gallery.forEach((img, i) => {
+        formData.append(`gallery`, img.file);
+        // formData.append(`gallery[${i}][file]`, img.file);
+        // formData.append(`gallery[${i}][preview]`, img.preview);
+      });
+      // console.log([...formData.entries()]);
+      //
+      const res = await axios.post(`${API_URL}/api/blog/create`, formData, {
+        withCredentials: true,
+      });
+      // console.log(res.data);
+      setMainImagePreview("");
+      // setBlogForm((prev) => ({
+      //   ...prev,
+      //   gallery: [],
+      // }));
+      setBlogForm(initialBlog);
+      Swal.fire({
+        title: "create successfully  🎉",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      const err = error.response?.data;
+      if (Array.isArray(err?.errors)) {
+        // const fieldErrors: Errors = {};initialBlogError: errorBlog
+        const fieldErrors = structuredClone(initialBlogError);
+        err.errors.forEach((e: { field: keyof errorBlog; message: string }) => {
+          if (e.field.startsWith("gallery")) {
+            const [, indexStr, key] = e.field.split(".");
+            const index = Number(indexStr);
+            if (isNaN(index)) return;
+            // TODO: handle nested gallery errors
+            if (!fieldErrors.gallery) {
+              fieldErrors.gallery = [];
+            }
+            (fieldErrors.gallery[index] as any)[key] = e.message;
+            setErrorBlog(fieldErrors);
+          } else {
+            fieldErrors[e.field as Exclude<keyof errorBlog, "gallery">] =
+              e.message;
+            setErrorBlog(fieldErrors);
+          }
+        });
+      } else {
+        Swal.fire({
+          title: "Error something ",
+          icon: "error",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
+    } finally {
+      setLoadingCategory(false);
+    }
+  };
+  const handleContentChange = (val: string | undefined) => {
+    setBlogForm((prev) => ({ ...prev, content: val ?? "" }));
+  };
+
+  if (loading) return <p>Loading...</p>;
+  const errorClass = "text-sm text-red-500 mt-1";
+  const inputErrorClass = "border-red-500 focus-visible:ring-red-500";
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
@@ -193,9 +318,7 @@ export default function Page() {
           <h1 className="font-heading text-3xl font-bold mb-8">
             Create Blog Post
           </h1>
-          <form
-          //   onSubmit={}
-          >
+          <form onSubmit={handleSubmitBlogFrom}>
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="font-heading text-lg">
@@ -217,7 +340,7 @@ export default function Page() {
                         // setMainImageFile(null);
                         setBlogForm((prev) => ({
                           ...prev,
-                          mainImage: null,
+                          main_image: null,
                         }));
                       }}
                       className="absolute top-2 right-2 rounded-full bg-foreground/70 p-1.5 text-background hover:bg-foreground transition-colors"
@@ -229,7 +352,7 @@ export default function Page() {
                   <button
                     type="button"
                     onClick={() => mainImageRef.current?.click()}
-                    className="w-full h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors cursor-pointer"
+                    className={`${errorBlog.main_image} ? inputErrorClass :  cursor-pointer w-full h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors`}
                   >
                     <ImagePlus className="h-8 w-8" />
                     <span className="text-sm">Click to upload main image</span>
@@ -239,9 +362,12 @@ export default function Page() {
                   ref={mainImageRef}
                   type="file"
                   accept="image/*"
-                  className="hidden cursor-pointer"
+                  className={`${errorClass} ? inputErrorClass : hidden cursor-pointer `}
                   onChange={handleMainImage}
                 />
+                {errorBlog.main_image && (
+                  <p className={errorClass}>{errorBlog.main_image}</p>
+                )}
               </CardContent>
             </Card>
 
@@ -258,18 +384,38 @@ export default function Page() {
                     value={blogForm.title}
                     onChange={handleChange}
                     required
+                    className={`${errorBlog.content} ? inputErrorClass : ""`}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="content">content</Label>
-                  <Textarea
+                  {/* <Textarea
                     id="content"
                     placeholder="Write your blog content..."
                     value={blogForm.content}
                     onChange={handleChange}
                     rows={12}
                     required
+                  /> */}
+                  <QuillEditor
+                    value={blogForm.content}
+                    onChange={handleContentChange}
+                    theme="snow"
+                    modules={{
+                      toolbar: [
+                        [{ header: [1, 2, 3, false] }],
+                        ["bold", "italic", "underline", "strike"],
+                        [{ list: "ordered" }, { list: "bullet" }],
+                        // ["link", "image"],
+                        ["clean"],
+                      ],
+                    }}
+                    style={{ height: "300px", marginBottom: "50px" }}
+                    className={`${errorBlog.content} ? inputErrorClass : ""`}
                   />
+                  {errorBlog.content && (
+                    <p className={errorClass}>{errorBlog.content}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="detail">type category</Label>
@@ -292,6 +438,9 @@ export default function Page() {
                       </div>
                     ))}
                   </div>
+                  {errorBlog.categories && (
+                    <p className={errorClass}>{errorBlog.categories}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -304,7 +453,7 @@ export default function Page() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-3 mb-4">
-                  {blogForm.coverImage.map((img, i) => (
+                  {blogForm.gallery.map((img, i) => (
                     <div
                       key={i}
                       className="relative rounded-lg overflow-hidden aspect-square"
@@ -340,16 +489,19 @@ export default function Page() {
                   className="hidden"
                   onChange={handleAdditionalImages}
                 />
+                {errorBlog.gallery && (
+                  <p className={errorClass}>{errorBlog.gallery}</p>
+                )}
               </CardContent>
             </Card>
             <Button
               type="submit"
               size="lg"
-              disabled={loading}
+              disabled={loadingCategory}
               className="w-full"
             >
               <Save className="mr-2 h-4 w-4" />
-              {loading ? "Creating..." : "Create Blog Post"}
+              {loadingCategory ? "Creating..." : "Create Blog Post"}
             </Button>
           </form>
         </div>
