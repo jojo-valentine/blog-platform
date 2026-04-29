@@ -5,8 +5,9 @@ import seedRole from "./001-add-role-seed";
 import seedUser from "./002-add-user-seed";
 import seedHasRole from "./003-add-has-role-seed";
 import seedProfile from "./004-add-profile-seed";
-import seedBlog from "./005-add-blog-seed";
-import seedImageBlog from "./006-add-blog-image-seed";
+import seedCategoryImage from "./005-add-type-blog-image-seed";
+import seedBlog from "./006-add-blog-seed";
+import seedImageBlog from "./007-add-blog-image-seed";
 
 dotenv.config(); // ✅ โหลด env ก่อน
 
@@ -18,6 +19,7 @@ async function runAllSeeds() {
     await seedUser();
     await seedHasRole();
     await seedProfile();
+    await seedCategoryImage();
     await seedBlog();
     await seedImageBlog();
 

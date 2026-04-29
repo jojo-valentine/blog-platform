@@ -67,18 +67,27 @@ const createUploadMiddleware =
       if (!req.file || !req.file.buffer) return next();
 
       try {
+        const userId = req.user?.userId;
+        if (!userId) throw new Error("Unauthorized");
+
         const filename = `${Date.now()}-${uuidv4()}.jpg`;
-        // 👉 เอา id จาก req (เช่น req.user.id หรือ req.params.id)
         const targetDir = getTargetDir(req);
-        const outputPath = path.join(ensureDir(targetDir), filename);
-        await sharp(req.file.buffer)
-          // .resize(500, 500, { fit: "cover" })
-          .jpeg({ quality: 90 })
-          .toFile(outputPath);
+
+        // ensure dir exists
+        fs.mkdirSync(targetDir, { recursive: true });
+
+        const outputPath = path.join(targetDir, filename);
+
+        await sharp(req.file.buffer).jpeg({ quality: 90 }).toFile(outputPath);
+
+        // relative path สำหรับ DB/frontend
+        const relativePath = `/upload/${userId}/avatar/${filename}`;
 
         req.file.filename = filename;
-        req.file.path = outputPath;
+        req.file.path = relativePath;
+        (req.file as any).fullPath = outputPath; // absolute path สำหรับจัดการไฟล์จริง
 
+        // console.log({ relativePath });
         return next();
       } catch (sharpError: any) {
         if (sharpError?.message === "Unauthorized") {
@@ -140,12 +149,7 @@ const createUploadMultipleMiddleware =
 
 export const uploadAvatar = createUploadMiddleware("avatar", (req) => {
   const userId = req.user?.userId;
-  // console.log({ userId: req.user, user: req.user });
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
+  if (!userId) throw new Error("Unauthorized");
   return path.join(__dirname, `../upload/${userId}/avatar`);
 });
 // รูป cover หลักของ blog
@@ -169,19 +173,16 @@ const MAX_BLOG_IMAGES = parseInt(process.env.MAX_BLOG_IMAGES || "5");
 //   },
 // );
 
-const uploadBlogFields = upload.fields([
-  {
-    name: "coverImage",
-    maxCount: 1,
-  },
-  {
-    name: "image",
-    maxCount: MAX_BLOG_IMAGES,
-  },
+const uploadBlogFields = multer({
+  storage: multer.memoryStorage(),
+}).fields([
+  { name: "main_image", maxCount: 1 },
+  { name: "gallery", maxCount: MAX_BLOG_IMAGES },
 ]);
 export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
   const userId = req.user?.userId;
   if (!userId) throw new Error("Unauthorized");
+
   uploadBlogFields(req as any, res, async (err: any) => {
     if (err) {
       req.multerError = {
@@ -192,12 +193,13 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
       return next();
     }
 
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-    if (!files) {
-      return next();
-    }
-
     try {
+      const files = req.files as {
+        main_image?: Express.Multer.File[];
+        gallery?: Express.Multer.File[];
+      };
+      // console.log({ files: files });
+
       const userId = req.user?.userId;
       if (!userId) res.status(401).json({ message: "Unauthorized" });
       const blogId = (req as any).blogId?.toString() || req.params.id;
@@ -206,10 +208,12 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
       if (!blogId) {
         return res.status(400).json({ message: "Missing blogId" });
       }
-      // process coverImage
-      if (files["coverImage"]?.[0]) {
-        const cover = files["coverImage"][0];
-        const filename = `${Date.now()}-${uuidv4()}.jpg`;
+      // =========================
+      // 1. MAIN IMAGE (single)
+      // =========================
+      if (files?.main_image?.length) {
+        const cover = files["main_image"][0];
+        const filename = `${Date.now()}-${uuidv4()}.webp`;
         const targetDir = ensureDir(
           // path.join(__dirname, `../upload/${userId}/blog/${blogId}/cover`),
 
@@ -218,24 +222,23 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
         const outputPath = path.join(targetDir, filename);
         const relativePath = `/upload/${userId}/blog/${blogId}/cover/${filename}`;
         await sharp(cover.buffer).jpeg({ quality: 90 }).toFile(outputPath);
-        files["coverImage"][0].filename = filename;
-        files["coverImage"][0].path = relativePath;
+        files["main_image"][0].filename = filename;
+        files["main_image"][0].path = relativePath;
       }
 
-      // process images
-      if (files["image"]?.length) {
-        for (const file of files["image"]) {
-          const filename = `${Date.now()}-${uuidv4()}.jpg`;
+      // =========================
+      // 2. GALLERY (multiple)
+      // =========================
+      if (files?.gallery?.length) {
+        for (const file of files["gallery"]) {
+          const filename = `${Date.now()}-${uuidv4()}.webp`;
           const targetDir = ensureDir(
-            // path.join(__dirname, `../upload/${userId}/blog/${blogId}/images`),
-            path.join(
-              process.cwd(),
-              `upload/${userId}/blog/${blogId}/images`,
-            ),
+            // path.join(__dirname, `../upload/${userId}/blog/${blogId}/gallery`),
+            path.join(process.cwd(), `upload/${userId}/blog/${blogId}/gallery`),
           );
           const outputPath = path.join(targetDir, filename);
           // 🔥 path สำหรับ save DB (relative)
-          const relativePath = `/upload/${userId}/blog/${blogId}/images/${filename}`;
+          const relativePath = `/upload/${userId}/blog/${blogId}/gallery/${filename}`;
           await sharp(file.buffer).jpeg({ quality: 90 }).toFile(outputPath);
           file.filename = filename;
           file.path = relativePath;
@@ -245,7 +248,7 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
     } catch (error: unknown) {
       req.multerError = {
         type: "sharp",
-        field: "image-processing",
+        field: "mainImage-processing",
         message: error instanceof Error ? error.message : "Unknown sharp error",
       };
 

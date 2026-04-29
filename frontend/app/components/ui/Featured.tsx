@@ -22,6 +22,8 @@ export default function Featured({
         alt="Featured article image"
         width={800}
         height={400}
+        loading="eager" // ✅ บังคับโหลดทันที
+        priority // ✅ ใช้คู่กันเพื่อบอก browser ว่าสำคัญ
       />
 
       <div className="featured-info">

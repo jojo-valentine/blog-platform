@@ -1,5 +1,6 @@
-import { User, Blog } from "../models";
-
+import { User, Blog, ImageCategory } from "../models";
+import dotenv from "dotenv";
+import connectDB from "../config/db";
 async function seedBlog() {
   try {
     console.log("🌱 Seeding blogs...");
@@ -14,13 +15,16 @@ async function seedBlog() {
     if (!users.length) {
       throw new Error("❌ users not found (run seedUser ก่อน)");
     }
+    const types = await ImageCategory.find();
+    // สุ่ม category 1-2 อัน
+    const randomTypes = types.sort(() => 0.5 - Math.random()).slice(0, 2);
 
     // สร้าง blog
     const blogs = users.map((u, index) => ({
       user_id: u._id,
       title: `Blog ${index + 1} by ${u.email}`,
       content: "This is a seeded blog post.",
-      tags: ["seed", "example"],
+      tag_id: randomTypes.map((t) => t._id),
       coverImage: [],
       online: false,
       suspended: false,
@@ -37,3 +41,17 @@ async function seedBlog() {
 }
 
 export default seedBlog;
+dotenv.config(); // ✅ โหลด env ก่อน
+async function runSeeds() {
+  try {
+    await connectDB(); // ✅ สำคัญที่สุด (ตัวแก้ปัญหา)
+    await seedBlog();
+    console.log("🌱 All seeds completed successfully");
+    process.exit();
+  } catch (error) {
+    console.error("❌ Seeding failed:", error);
+    process.exit(1);
+  }
+}
+
+runSeeds();

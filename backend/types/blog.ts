@@ -1,9 +1,10 @@
-import mongoose, { Document } from "mongoose";
+import mongoose, { Document, Types } from "mongoose";
 export interface IBlog extends Document {
+
   user_id: mongoose.Types.ObjectId;
   title: string;
   content: string;
-  tags: string[];
+  tags_id: mongoose.Types.ObjectId[];
   coverImage?: string;
   online: boolean;
   suspended: boolean;

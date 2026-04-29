@@ -117,7 +117,7 @@ class BlogController {
             .map((t: any) => t.trim());
         }
         // 3. กรณี travel,food
-        return tags.split(",").map((t: any) => t.trim());
+        return tags.split(",").map((t: string) => t.trim());
       }
 
       return []; // default fallback
@@ -125,38 +125,37 @@ class BlogController {
     // console.log({ file: req.files, body: req.body });
     const session = await mongoose.startSession();
     try {
-      const { title, content, tags, online } = req.body;
+      const { title, content, categories } = req.body;
 
       const files = req.files as {
-        coverImage?: Express.Multer.File[];
-        image?: Express.Multer.File[];
+        gallery?: Express.Multer.File[];
+        main_image?: Express.Multer.File[];
       };
-      const coverImage = files?.coverImage?.[0] || null;
-      const images = files?.image || [];
+      const images = files?.gallery || [];
+      const mainImage = files?.main_image || [];
       const blogId = (req as any).blogId.toString();
 
       let newBlog: any = null;
 
       await session.withTransaction(async () => {
         // ✅ 1. create blog
-        const [blog] = await Blog.create(
-          [
-            {
-              _id: blogId,
-              user_id: user.userId,
-              title,
-              content,
-              tags: parseTags(tags),
-              online: online === true || online === "true",
-              suspended: false,
-              coverImage: coverImage?.path,
-            },
-          ],
-          { session },
-        );
+        const blog = new Blog({
+          _id: blogId,
+          user_id: new mongoose.Types.ObjectId(user.userId),
+          title,
+          content,
+          tags_id: parseTags(categories).map(
+            (id) => new mongoose.Types.ObjectId(id),
+          ),
+          suspended: false,
+          coverImage: mainImage?.[0]?.path,
+        });
+
+        await blog.save({ session });
         // ✅ 2. create images
         type ImageDoc = HydratedDocument<IImageBlog>;
         let createdImages: IImageBlog[] = [];
+        // ✅ แก้
 
         if (images.length > 0) {
           createdImages = await ImageBlog.insertMany(
@@ -169,12 +168,6 @@ class BlogController {
             { session },
           );
         }
-
-        // ✅ 3. link image → blog (ถ้าคุณมี field images)
-        // if (createdImages.length > 0) {
-        //   blog.images = createdImages.map((img) => img._id);
-        //   await blog.save({ session });
-        // }
 
         newBlog = blog;
       });
@@ -321,23 +314,23 @@ class BlogController {
 
           return []; // default fallback
         };
-        const oldTags = parseTags(blogPost.tags ?? "");
-        const newTags = parseTags(req.body.tags ?? "");
-        let mergedTags: string[] = [];
-        // 2. เทียบว่ามีการเปลี่ยนแปลงหรือไม่
-        const isChanged =
-          oldTags.length !== newTags.length ||
-          oldTags.some((tag) => !newTags.includes(tag));
-        if (isChanged) {
-          // // 3. หา tag ที่เพิ่มเข้ามา
-          const addedTags = newTags.filter((tag) => !oldTags.includes(tag));
-          // ✅ merge แล้ว dedup ด้วย Set
-          // const mergedTags = [...new Set([...oldTags, ...newTags])];
-          const oldTagsSet = new Set(oldTags);
-          addedTags.forEach((tag) => oldTagsSet.add(tag));
-          mergedTags = Array.from(oldTagsSet);
-          // console.log(mergedTags);
-        }
+        // const oldTags = parseTags(blogPost.tags ?? "");
+        // const newTags = parseTags(req.body.tags ?? "");
+        // let mergedTags: string[] = [];
+        // // 2. เทียบว่ามีการเปลี่ยนแปลงหรือไม่
+        // const isChanged =
+        //   oldTags.length !== newTags.length ||
+        //   oldTags.some((tag) => !newTags.includes(tag));
+        // if (isChanged) {
+        //   // // 3. หา tag ที่เพิ่มเข้ามา
+        //   const addedTags = newTags.filter((tag) => !oldTags.includes(tag));
+        //   // ✅ merge แล้ว dedup ด้วย Set
+        //   // const mergedTags = [...new Set([...oldTags, ...newTags])];
+        //   const oldTagsSet = new Set(oldTags);
+        //   addedTags.forEach((tag) => oldTagsSet.add(tag));
+        //   mergedTags = Array.from(oldTagsSet);
+        //   // console.log(mergedTags);
+        // }
 
         let oldCoverImage: string = "";
         let newCoverImage: string = "";
@@ -363,7 +356,7 @@ class BlogController {
           {
             title,
             content,
-            tags: isChanged ? mergedTags : oldTags,
+            // tags: isChanged ? mergedTags : oldTags,
             online: online === true || online === "true",
             coverImage: newCoverImage || oldCoverImage,
           },

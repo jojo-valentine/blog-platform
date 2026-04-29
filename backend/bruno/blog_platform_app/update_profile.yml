@@ -1,7 +1,7 @@
 info:
   name: update_profile
   type: http
-  seq: 9
+  seq: 11
 
 http:
   method: PUT
@@ -12,7 +12,7 @@ http:
   body:
     type: multipart-form
     data:
-      - name: displayName
+      - name: display_name
         type: text
         value: Shadow2
         contentType: text
@@ -47,16 +47,16 @@ http:
 
 runtime:
   variables:
-    - name: displayName
+    - name: display_name
       value: ""
       disabled: true
-    - name: bio
+    - name: age
       value: ""
       disabled: true
     - name: avatar
       value: ""
       disabled: true
-    - name: socialLinks
+    - name: social_links
       value: ""
       disabled: true
 

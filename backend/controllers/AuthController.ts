@@ -1,14 +1,16 @@
 import { Request, Response } from "express";
 import otpService from "../services/otpService";
 import emailService from "../services/emailService";
+import tokenServices from "../services/tokenService";
 import mongoose, { mongo } from "mongoose";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { HasRole, Otp, Profile, Role } from "../models";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { HasRole, Otp, Profile, ResetToken, Role } from "../models";
 import { User } from "../models";
 import tokenService from "../services/tokenService";
 import { IRole } from "../types";
 import { success } from "zod";
+import crypto from "crypto";
 
 class AuthController {
   static async register(req: Request, res: Response) {
@@ -38,8 +40,8 @@ class AuthController {
       });
 
       // ❗ 2. send email (ถ้า error → rollback)
-      // await emailService.verifyConnection();
-      // await emailService.sendOtpEmail(email, otp);
+      await emailService.verifyConnection();
+      await emailService.sendOtpEmail(email, otp);
       // 🔥 3. hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -55,7 +57,13 @@ class AuthController {
         process.env.JWT_SECRET as string,
         { expiresIn: "30m" },
       );
-
+      res.cookie("accessToken", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production", // dev ใช้ false
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 60 * 1000, // 30 นาที
+      });
       // ✅ 5. ส่ง token กลับ
       return res.status(200).json({
         message: "OTP sent to email",
@@ -76,7 +84,9 @@ class AuthController {
     const session = await mongoose.startSession();
     let responseData: any = null;
     try {
-      const { otp, token } = req.body;
+      const { otp } = req.body;
+      const token = req.cookies.accessToken;
+
       if (!otp || !token) {
         return res.status(400).json({
           message: "OTP and token are required",
@@ -159,7 +169,7 @@ class AuthController {
           [
             {
               user_id: user._id,
-              displayName: name,
+              display_name: name,
             },
           ],
           { session },
@@ -211,6 +221,10 @@ class AuthController {
         email: user.email,
         roles: roleData, // 👈 array
         permissions, // 👈 array
+        profile: {
+          avatar: user.profile?.avatar || "",
+          display_name: user.profile?.display_name || "",
+        },
       };
       // access token อายุสั้น
       const accessToken = jwt.sign(payload, process.env.JWT_SECRET as string, {
@@ -221,22 +235,28 @@ class AuthController {
         expiresIn: "7d",
       });
 
-      const cookieOptions = {
+      // accessToken — อายุ 15 นาที
+      res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: false, // dev
-        sameSite: "lax" as const,
+        sameSite: "lax",
         path: "/",
-        maxAge: refreshToken ? 7 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000,
-      };
-      // เซ็ต cookie
-      // console.log("refreshToken", refreshToken);
-      res.cookie("refreshToken", refreshToken, cookieOptions);
-      // res.cookie("refreshToken", accessToken, cookieOptions);
+        maxAge: 15 * 60 * 1000, // 15 นาที
+      });
 
+      // refreshToken — อายุ 7 วัน
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: false, // dev
+        sameSite: "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 วัน
+      });
       // ถ้า password ถูกต้อง ก็สามารถสร้าง JWT หรือ session ต่อได้
       return res.status(200).json({
         message: "Login successful",
         accessToken,
+        refreshToken,
         payload,
       });
     } catch (err: any) {
@@ -245,46 +265,57 @@ class AuthController {
   }
   static async passwordResetVerifyCheck(req: Request, res: Response) {
     const { email } = req.body;
-    console.log("reset test");
 
-    const user = await User.findOne({ email });
+    // console.log(email);
+
+    const user = await User.findOne({ email }).populate({
+      path: "profile",
+      select: "avatar display_name",
+    });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const session = await mongoose.startSession();
     try {
-      const otp = otpService.generateOTP();
-      await emailService.verifyConnection();
-      // 🔥 1. ทำเฉพาะ DB ใน transaction
-      // 2. สร้าง OTP + commit
-      const record = await session.withTransaction(async () => {
-        return await otpService.createOtp(
-          {
-            contact: email,
-            otp,
-            type: "reset_password",
-          },
-          { session },
+      // const otp = otpService.generateOTP();
+
+      const rawToken = await session.withTransaction(async () => {
+        return await tokenServices.generateRefreshToken(
+          user._id.toString(),
+          session,
         );
       });
 
+      await emailService.verifyConnection();
+      // 🔥 1. ทำเฉพาะ DB ใน transaction
+      // 2. สร้าง OTP + commit
+      // const record = await session.withTransaction(async () => {
+      //   return await otpService.createOtp(
+      //     {
+      //       contact: email,
+      //       otp,
+      //       type: "reset_password",
+      //     },
+      //     { session },
+      //   );
+      // });
+
       // ❗ 2. send email (ถ้า error → rollback)
-
-      // await emailService.sendOtpEmail(email, otp);
-
-      const token = jwt.sign(
-        {
-          email,
-          type: "reset_password",
-          otpId: record._id,
-        },
-        process.env.JWT_SECRET as string,
-        { expiresIn: "30m" },
-      );
+      const link = `${process.env.CLIENT_URL}/pages/forgot-password/update-password?token=${rawToken}`;
+      await emailService.sendForgetPasswordEmail(email, link);
+      // const token = jwt.sign(
+      //   {
+      //     email,
+      //     type: "reset_password",
+      //     otpId: record._id,
+      //   },
+      //   process.env.JWT_SECRET as string,
+      //   { expiresIn: "30m" },
+      // );
 
       return res.status(200).json({
-        message: "you has been successfuly reset otp",
-        otp: otp,
-        token,
+        message: "you has been successfully reset otp",
+        // otp: otp,
+        token: rawToken,
       });
     } catch (err: any) {
       console.error("🔴 resent password error:", err); // log ทั้ง object ไม่ใช่แค่ message
@@ -295,86 +326,59 @@ class AuthController {
       session.endSession(); // ✅ ต้องมี
     }
   }
+  static async passwordVerifyResetToken(req: Request, res: Response) {
+    const { token } = req.body;
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    try {
+      const resetToken = await ResetToken.findOne({ token: hashedToken });
+      if (!resetToken || resetToken.expiresAt < new Date()) {
+        return res.status(400).json({ valid: false, message: "Token expired" });
+      }
+      res.json({ valid: true });
+    } catch (err) {
+      res.status(500).json({ valid: false, message: "Server error" });
+    }
+  }
   static async passwordUpdate(req: Request, res: Response) {
     const session = await mongoose.startSession();
     let decoded: any;
 
     try {
-      const { otp, token, password } = req.body;
-
-      try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET as string);
-      } catch {
-        return res.status(401).json({
-          message: "Invalid or expired token",
-        });
-      }
+      const { token, password, password_confirm } = req.body;
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
 
       await session.withTransaction(async () => {
-        const { email, type } = decoded;
-        // console.log({
-        //   email: email,
-        //   type: type,
-        // });
-        if (!otp || !token) {
-          throw new Error("OTP and token are required");
-        }
-        if (!password) {
-          throw new Error("please provide password");
-        }
-        if (decoded.type !== "reset_password") {
-          throw new Error("Invalid token type");
-        }
-
-        const record = await Otp.findOne({
-          _id: decoded.otpId,
-          type: "reset_password",
-          contact: email,
-        })
-          // .sort({ createdAt: -1 })
-          .session(session);
-
-        if (!record) {
-          throw new Error("OTP not found");
-        }
-        // 🔥 3. เช็คหมดอายุ
-        if (record.expiresAt < new Date()) {
-          throw new Error("OTP expired");
-        }
-        // 🔥 4. เช็คว่าใช้ไปแล้ว
-        if (record.verifyAt) {
-          throw new Error("OTP already used");
-        }
-        // 🔥 5. compare OTP
-        const isValid = await bcrypt.compare(otp, record.otpHash);
-        if (!isValid) {
-          throw new Error("Invalid OTP");
-        }
-        // 🔥 6. mark verify
-        record.verifyAt = new Date();
-        await record.save({ session });
-
-        const user = await User.findOne({
-          email,
+        const resetToken = await ResetToken.findOne({
+          token: hashedToken,
         }).session(session);
-
-        if (!user) {
-          throw new Error("user not found");
+        if (!resetToken || resetToken.expiresAt < new Date()) {
+          // return res.status(400).json({ valid: false, message: "Token expired" });
+          throw new Error("Invalid or expired token");
         }
 
-        user.password = await bcrypt.hash(password, 10);
+        if (password !== password_confirm) {
+          throw new Error("Passwords do not match");
+        }
+        const user = await User.findById(resetToken.user_id).session(session);
+        if (!user) {
+          throw new Error("not found user");
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        user.password = hashedPassword;
         await user.save({ session });
+        await ResetToken.deleteOne({ _id: resetToken._id }).session(session);
       });
 
       return res.status(200).json({
-        message: "you has beed update password plase login again",
+        message: "you has been update password please login again",
       });
     } catch (err: any) {
       // console.error("🔴 passwordUpdate error:", err);
-      console.log("JWT ERROR:", err); // 👈 เพิ่มบรรทัดนี้
-      return res.status(401).json({
-        message: "Invalid or expired token",
-      });
       return res.status(400).json({
         message: err.message || "Something went wrong",
       });
@@ -436,7 +440,7 @@ class AuthController {
       res.clearCookie("accessToken", cookieOptions);
       res.clearCookie("refreshToken", cookieOptions);
 
-      return res.status(200).json({ message: "Logged out successfury" });
+      return res.status(200).json({ message: "Logged out successfully" });
     } catch (err: any) {
       return res.status(500).json({
         message: "Something went wrong",
@@ -445,8 +449,8 @@ class AuthController {
   }
   static async updateNewPassword(req: Request, res: Response) {
     // oldPassword newpassword
-    const { password, newPassword, confirmNewPassword } = req.body;
-    console.log(password, newPassword, confirmNewPassword, req.user);
+    const { password_old, password_new, password_confirm } = req.body;
+    console.log(password_old, password_new, password_confirm, req.user);
 
     if (!req.user?.userId) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -458,158 +462,117 @@ class AuthController {
         const user = await User.findById(req.user?.userId).session(session); // ✅ ใช้ session
         if (!user) throw new Error("User not found"); // ✅ throw แทน return res
 
-        const isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(password_old, user.password);
         if (!isMatch) throw new Error("Old password is incorrect"); // ✅ throw แทน return res
 
-        user.password = await bcrypt.hash(newPassword, 10);
+        const isMatchNewPassword = password_new === password_confirm;
+        if (!isMatchNewPassword) {
+          throw new Error("New passwords do not match");
+        }
+
+        user.password = await bcrypt.hash(password_new, 10);
         await user.save({ session }); // ✅ ใช้ session
       });
       return res.status(200).json({
-        message: "successfury update",
+        message: "successfully update",
       });
-    } catch (err: any) {
-      if (err.message === "User not found") {
-        return res.status(404).json({ message: "User not found" });
-      }
-      if (err.message === "Old password is incorrect") {
-        return res.status(400).json({ message: "Old password is incorrect" });
-      }
-      return res.status(500).json({ message: "Something went wrong" });
+    } catch (error: unknown) {
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Server error",
+      });
     } finally {
       session.endSession();
     }
   }
   static async requestChangeEmail(req: Request, res: Response) {
     const { email } = req.body;
-    console.log(email);
-
     const session = await mongoose.startSession();
+
     try {
       if (!req.user) {
-        return res.status(401).json({
-          message: "Unauthorized",
-        });
+        return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // หลังจากนี้ TS จะรู้ว่าไม่ undefined
       const userId = req.user.userId;
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({
-          message: "Email already in use, please use another email",
-        });
-      }
 
-      let token: string = "";
-      let otpCode: string = "";
+      let rawToken: string;
+
+      // ✅ ทำเฉพาะ DB ใน transaction
       await session.withTransaction(async () => {
-        const otp = otpService.generateOTP();
-        otpCode = otp;
-        await otpService.createOtp(
-          {
-            contact: email,
-            otp,
-            type: "request_new_email",
-          },
-          { session },
-        );
-        // ❗ 2. send email (ถ้า error → rollback)
-        // await emailService.verifyConnection();
-        // await emailService.sendOtpEmail(email, otp);
+        const existingUser = await User.findOne({ email }).session(session);
+        if (existingUser) {
+          throw new Error("Email already in use");
+        }
 
-        // 🔥 4. generate token
-        token = jwt.sign(
-          {
-            email,
-            type: "request_new_email",
-            userId: userId,
-          },
-          process.env.JWT_SECRET as string,
-          { expiresIn: "30m" },
+        rawToken = await tokenServices.generateTokenNewEmail(
+          userId.toString(),
+          session,
+          email,
         );
       });
 
-      // ✅ ส่งใน cookie แทน
-      res.cookie("changeEmailToken", token, {
-        httpOnly: true,
-        secure: false, // dev
-        sameSite: "lax" as const,
-        maxAge: 30 * 60 * 1000, // 30 นาที
-      });
+      // ✅ ออกจาก transaction แล้วค่อยส่ง email
+      const link = `${process.env.CLIENT_URL}/pages/confirm-change-email?token=${rawToken!}`;
+
+      await emailService.verifyConnection();
+      await emailService.senNewEmail(email, link);
 
       return res.status(200).json({
-        message: "OTP sent successfully",
-        change_email_token: token,
-        otp: otpCode,
+        message: "Send new email successfully",
       });
     } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.message === "Email already in use") {
+          return res.status(400).json({ message: err.message });
+        }
+      }
+
       return res.status(500).json({
         message: "Server error",
-        error: err instanceof Error ? err.message : "Unknown error",
       });
     } finally {
       session.endSession();
     }
   }
   static async changeEmail(req: Request, res: Response) {
-    const { otp } = req.body;
-    const token = req.cookies?.changeEmailToken;
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const session = await mongoose.startSession();
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-        userId: string;
-        email: string;
-        type: string;
-      };
-
-      const record = await Otp.findOne({
-        contact: decoded.email,
-        type: "request_new_email",
-      }).sort({ createdAt: -1 });
-
-      if (!record) {
-        return res.status(400).json({
-          message: "OTP not found",
-        });
-      }
-      // 🔥 3. เช็คหมดอายุ
-      if (record.expiresAt < new Date()) {
-        return res.status(400).json({
-          message: "OTP expired",
-        });
-      }
-      // 🔥 4. เช็คว่าใช้ไปแล้ว
-      if (record.verifyAt) {
-        return res.status(400).json({
-          message: "OTP already used",
-        });
-      }
-      // 🔥 5. compare OTP
-      const isValid = await bcrypt.compare(otp, record.otpHash);
-
-      if (!isValid) {
-        return res.status(400).json({
-          message: "Invalid OTP",
-        });
-      }
-      const user = await User.findById(decoded.userId);
-      if (!user) {
-        return res.status(404).json({
-          message: "not found data",
-        });
-      }
       await session.withTransaction(async () => {
-        record.verifyAt = new Date();
-        await record.save({ session });
-        // await record.
-        await user.updateOne({ email: decoded.email }, { session });
+        const { token } = req.body;
+        // const token = req.cookies?.changeEmailToken;
+        if (!token) {
+          throw new Error("Unauthorized");
+        }
+
+        const hashedToken = crypto
+          .createHash("sha256")
+          .update(token)
+          .digest("hex");
+        const resetToken = await ResetToken.findOne({
+          token: hashedToken,
+        }).session(session);
+        if (!resetToken || resetToken.expiresAt < new Date()) {
+          // return res.status(400).json({ valid: false, message: "Token expired" });
+          throw new Error("Invalid or expired token");
+        }
+
+        const user = await User.findById(resetToken.user_id).session(session);
+        if (!user) {
+          throw new Error("not found user");
+        }
+        const existing = await User.findOne({
+          email: resetToken.contact,
+          _id: { $ne: user._id }, // 👈 ยกเว้นตัวเอง
+        }).session(session);
+        if (existing) {
+          throw new Error("Email already in use");
+        }
+        user.email = resetToken.contact;
+        await user.save({ session });
+
+        // 🔥 ลบ token กัน reuse
+        await ResetToken.deleteOne({ _id: resetToken._id }).session(session);
       });
-      // ✅ clear cookie หลัง success
-      res.clearCookie("changeEmailToken");
 
       return res.status(200).json({
         message: "successfury update email",
@@ -621,6 +584,107 @@ class AuthController {
       });
     } finally {
       session.endSession();
+    }
+  }
+  static async refreshUser(req: Request, res: Response) {
+    try {
+      const refreshToken = req.cookies?.refreshToken;
+
+      if (!refreshToken) {
+        return res.status(401).json({ message: "No refresh token" });
+      }
+
+      const decoded = jwt.verify(
+        refreshToken,
+        process.env.JWT_SECRET as string,
+      ) as JwtPayload & { id: string };
+      // console.log(decoded);
+
+      const user = await User.findById(decoded.id).populate({
+        path: "profile",
+        select: "avatar display_name",
+      });
+      if (!user) {
+        res.clearCookie("refreshToken");
+        res.clearCookie("accessToken");
+
+        return res.status(401).json({
+          message: "User not found",
+          forceLogout: true,
+        });
+      }
+      // // 🔥 ดึง role
+      const hasRoles = await HasRole.find({ user_id: user._id })
+        .populate<{
+          role_id: IRole;
+        }>("role_id")
+        .lean();
+
+      const roleData = hasRoles.map((r) => r.role_id.name);
+
+      const permissions = hasRoles.flatMap((r) => r.role_id.permissions);
+
+      // // 🔥 4. generate token
+      const payload = {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        roles: roleData, // 👈 array
+        permissions, // 👈 array
+        profile: {
+          avatar: user.profile?.avatar || "",
+          display_name: user.profile?.display_name || "",
+        },
+      };
+      const accessToken = jwt.sign(payload, process.env.JWT_SECRET as string, {
+        expiresIn: "15m",
+      });
+
+      const newRefreshToken = jwt.sign(
+        payload,
+        process.env.JWT_SECRET as string,
+        {
+          expiresIn: "7d",
+        },
+      );
+
+      // ✅ set cookies
+      res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 15 * 60 * 1000,
+      });
+
+      res.cookie("refreshToken", newRefreshToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+      return res.status(200).json({
+        message: "refresh user successful",
+        accessToken,
+        refreshToken,
+        payload,
+      });
+    } catch (err: unknown) {
+      res.clearCookie("newRefreshToken", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+        path: "/",
+      });
+      console.error(
+        "Refresh error:",
+        err instanceof Error ? err.message : "Unknown error",
+      );
+      return res.status(401).json({
+        message: err instanceof Error ? err.message : "Unknown error",
+        forceLogout: true,
+      });
     }
   }
 }

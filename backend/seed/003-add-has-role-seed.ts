@@ -1,5 +1,6 @@
 import { User, Role, HasRole } from "../models";
-
+import dotenv from "dotenv";
+import connectDB from "../config/db";
 async function seedHasRole() {
   try {
     console.log("🌱 Seeding hasRole...");
@@ -41,3 +42,17 @@ async function seedHasRole() {
 }
 
 export default seedHasRole;
+dotenv.config(); // ✅ โหลด env ก่อน
+async function runSeeds() {
+  try {
+    await connectDB(); // ✅ สำคัญที่สุด (ตัวแก้ปัญหา)
+    await seedHasRole();
+    console.log("🌱 All seeds completed successfully");
+    process.exit();
+  } catch (error) {
+    console.error("❌ Seeding failed:", error);
+    process.exit(1);
+  }
+}
+
+runSeeds();

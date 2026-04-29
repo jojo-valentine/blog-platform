@@ -15,26 +15,65 @@ const fields = {
   mobile: z.string().regex(/^\d{10}$/, "Mobile must be 10 digits"),
   password: z
     .string()
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
-      "Password must be strong",
-    )
-    .min(6, "Password must be at least 6 characters"),
-
+    .min(6, "Password must be at least 6 characters")
+    .refine((val) => /[a-z]/.test(val), {
+      message: "Password must include a lowercase letter",
+    })
+    .refine((val) => /[A-Z]/.test(val), {
+      message: "Password must include an uppercase letter",
+    })
+    .refine((val) => /\d/.test(val), {
+      message: "Password must include a number",
+    })
+    .refine((val) => /[@$!%*?&]/.test(val), {
+      message: "Password must include a special character (@$!%*?&)",
+    }),
+  password_confirm: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .refine((val) => /[a-z]/.test(val), {
+      message: "Password must include a lowercase letter",
+    })
+    .refine((val) => /[A-Z]/.test(val), {
+      message: "Password must include an uppercase letter",
+    })
+    .refine((val) => /\d/.test(val), {
+      message: "Password must include a number",
+    })
+    .refine((val) => /[@$!%*?&]/.test(val), {
+      message: "Password must include a special character (@$!%*?&)",
+    }),
   newPassword: z
     .string()
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
-      "Password must be strong",
-    )
-    .min(6, "Password must be at least 6 characters"),
+    .min(6, "Password must be at least 6 characters")
+    .refine((val) => /[a-z]/.test(val), {
+      message: "Password must include a lowercase letter",
+    })
+    .refine((val) => /[A-Z]/.test(val), {
+      message: "Password must include an uppercase letter",
+    })
+    .refine((val) => /\d/.test(val), {
+      message: "Password must include a number",
+    })
+    .refine((val) => /[@$!%*?&]/.test(val), {
+      message: "Password must include a special character (@$!%*?&)",
+    }),
   confirmNewPassword: z
     .string()
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
-      "Password must be strong",
-    )
-    .min(6, "Password must be at least 6 characters"),
+    .min(6, "Password must be at least 6 characters")
+    .refine((val) => /[a-z]/.test(val), {
+      message: "Password must include a lowercase letter",
+    })
+    .refine((val) => /[A-Z]/.test(val), {
+      message: "Password must include an uppercase letter",
+    })
+    .refine((val) => /\d/.test(val), {
+      message: "Password must include a number",
+    })
+    .refine((val) => /[@$!%*?&]/.test(val), {
+      message: "Password must include a special character (@$!%*?&)",
+    }),
+  token: z.string().length(64, "Invalid token format"), // sha256 = 64 chars
 };
 
 export const authSchemas = {
@@ -48,26 +87,31 @@ export const authSchemas = {
     email: fields.email,
     password: fields.password,
   }),
-  update_reset_password: z.object({
-    otp: z.string().min(1, "OTP is required"),
-    token: z.string().min(1, "Token is required"),
-    password: fields.password,
-  }),
+  update_reset_password: z
+    .object({
+      token: z.string().min(1, "Token is required"),
+      password: fields.password,
+      password_confirm: fields.password_confirm,
+    })
+    .refine((data) => data.password === data.password_confirm, {
+      message: "Passwords do not match",
+      path: ["password_confirm"],
+    }),
   update_chang_password: z.object({
     email: fields.email,
   }),
   update_new_password: z
     .object({
-      password: fields.password,
-      newPassword: fields.newPassword,
-      confirmNewPassword: fields.confirmNewPassword,
+      password_old: fields.password,
+      password_new: fields.newPassword,
+      password_confirm: fields.confirmNewPassword,
     })
-    .refine((data) => data.newPassword === data.confirmNewPassword, {
+    .refine((data) => data.password_new === data.password_confirm, {
       message: "Passwords do not match",
-      path: ["confirmNewPassword"],
+      path: ["password_confirm"],
     }),
   update_new_email: z.object({
-    otp: z.string().min(1, "OTP is required").max(6, "OTP MAX 6 "),
+    token: fields.token.min(1, "Token is required"),
   }),
 };
 

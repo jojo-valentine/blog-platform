@@ -24,7 +24,9 @@ router.post(
   AuthController.login,
 );
 router.post("/verify-register-otp/", AuthController.verifyRegisterOtp);
-router.post("/reset/password/", AuthController.passwordResetVerifyCheck);
+router.post("/reset/forgot-password/", AuthController.passwordResetVerifyCheck);
+router.post("/verify-reset-token", AuthController.passwordVerifyResetToken);
+
 router.patch(
   "/reset/update/password/",
   useValidation({ body: authSchemas.update_reset_password }),
@@ -37,9 +39,16 @@ router.get("/profile", authMiddleware, UserController.profile);
 router.put(
   "/profile/update",
   authMiddleware,
-  uploadAvatar,
+  // uploadAvatar,
   useValidation({ body: profileSchemas.update }),
   UserController.updateProfile,
+);
+router.post(
+  "/profile/avatar",
+  authMiddleware,
+  uploadAvatar,
+  // useValidation({ body: profileSchemas.avatar }),
+  UserController.uploadAvatar,
 );
 router.patch(
   "/update-password",
@@ -47,21 +56,20 @@ router.patch(
   useValidation({ body: authSchemas.update_new_password }),
   AuthController.updateNewPassword,
 );
+
 router.post(
   "/request-change-email",
   authMiddleware,
   AuthController.requestChangeEmail,
 );
 // confirm-change-email
-router.put(
+router.patch(
   "/confirm-change-email",
-  authMiddleware,
+  // authMiddleware,
   useValidation({ body: authSchemas.update_new_email }),
   AuthController.changeEmail,
 );
-router.get("/test", authMiddleware, (req: Request, res: Response) => {
-  res.send("Auth middlwere route working");
-});
+router.get("/me", AuthController.refreshUser);
 
 // updatepassword
 // updateemail

@@ -1,0 +1,39 @@
+info:
+  name: upload_avatar_profile
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{base_url}}/api/auth/profile/avatar"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  body:
+    type: multipart-form
+    data:
+      - name: avatar
+        type: file
+        value:
+          - C:\Users\UsEr\Downloads\HGRRmkFbAAAS8-r.jpg
+
+runtime:
+  variables:
+    - name: display_name
+      value: ""
+      disabled: true
+    - name: age
+      value: ""
+      disabled: true
+    - name: avatar
+      value: ""
+      disabled: true
+    - name: social_links
+      value: ""
+      disabled: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

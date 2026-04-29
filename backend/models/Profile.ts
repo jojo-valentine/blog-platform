@@ -4,11 +4,11 @@ import { IProfile } from "../types/profile";
 const ProfileSchema = new Schema<IProfile>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    displayName: { type: String, required: true },
-    bio: { type: String, default: null },
+    display_name: { type: String, required: true },
+    age: { type: String, default: null },
     avatar: { type: String, default: null },
 
-    socialLinks: [
+    social_links: [
       {
         platform: { type: String, required: true },
         url: { type: String, required: true },

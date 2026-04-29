@@ -8,7 +8,7 @@ http:
   url: "{{base_url}}/api/otp/resend-otp"
   headers:
     - name: Cookie
-      value: resendContactToken={{token}}
+      value: accessToken={{token}}
   params:
     - name: Authorization
       value: Bearer {{token}}

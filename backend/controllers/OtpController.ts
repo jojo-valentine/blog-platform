@@ -11,7 +11,8 @@ class otpController {
   static async otpsent(req: Request, res: Response) {
     try {
       // const { token } = req.body;
-      const token = req.cookies?.resendContactToken;
+      const token = req.cookies?.accessToken;
+
       if (!token) {
         return res.status(401).json({ message: "Unauthorized" });
       }

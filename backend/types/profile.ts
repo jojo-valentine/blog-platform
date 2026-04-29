@@ -1,8 +1,8 @@
 import mongoose, { Document } from "mongoose";
 export interface IProfile extends Document {
   user_id: mongoose.Types.ObjectId;
-  displayName: string;
-  bio?: string;
+  display_name: string;
+  age?: string;
   avatar?: string;
-  socialLinks?: string[];
+  social_links?: string[];
 }
