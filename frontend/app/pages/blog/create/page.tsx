@@ -256,6 +256,8 @@ export default function Page() {
         icon: "success",
         timer: 1500,
         showConfirmButton: false,
+      }).then(() => {
+        router.push("/pages/blog/");
       });
     } catch (error: any) {
       const err = error.response?.data;

@@ -23,40 +23,63 @@ class BlogController {
       const limit = Math.min(Number(req.query.limit) || 10, 50);
       const skip = (page - 1) * limit;
 
-      // ✅ search
+      // search
       const q = (req.query.search as string)?.trim();
-      const tags = (req.query.tags as string)?.split(",");
+
       const filter: any = {
         user_id: user.userId,
         deletedAt: null,
       };
-      // 🔥 ถ้ามี keyword
+
+      // ✅ category parse
+      // const categoryRaw = (req.query.category || req.query["category[]"]) as
+      //   | string
+      //   | string[]
+      //   | undefined;
+      const categoryRaw = req.query.category || req.query["category[]"];
+
+      const category = Array.isArray(categoryRaw)
+        ? categoryRaw
+        : typeof categoryRaw === "string"
+          ? categoryRaw.split(",")
+          : [];
+
+      // ✅ category filter (ต้องอยู่นอก if q)
+      // const validIds = category
+      //   .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      //   .map((id) => new mongoose.Types.ObjectId(id));
+
+      if (category.length > 0) {
+        filter.tags_id = { $all: category };
+      }
+
+      // ✅ search filter
       if (q) {
         const orConditions: any[] = [
           { title: { $regex: q, $options: "i" } },
           { content: { $regex: q, $options: "i" } },
-          { tags: { $elemMatch: { $regex: q, $options: "i" } } },
         ];
 
-        // 🔥 ถ้า q เป็น ObjectId
         if (mongoose.Types.ObjectId.isValid(q)) {
           orConditions.push({ _id: new mongoose.Types.ObjectId(q) });
         }
 
         filter.$or = orConditions;
       }
-      if (tags && tags.length > 0) {
-        filter.tags = { $in: tags };
-      }
+
       const [blogs, total] = await Promise.all([
         Blog.find(filter)
           .select(
-            "title content coverImage tags suspended online createdAt deletedAt",
+            "title content tags_id cover_image  suspended is_online createdAt deletedAt",
           )
           .populate({
             path: "images",
             match: { deletedAt: null },
-            select: "path image",
+            select: "path ",
+          })
+          .populate({
+            path: "tags_id", // 👈 สำคัญ
+            select: "name", // เอาเฉพาะ field ที่ต้องใช้
           })
           .sort({ createdAt: -1 })
           .skip(skip)
@@ -67,7 +90,7 @@ class BlogController {
       // const blogs = await Blog.find({
       //   user_id: user.userId,
       //   deletedAt: { $exists: false },
-      // }).populate({ path: "images", match: { deletedAt: { $exists: false } } });
+      // }).populate({ path: "images", match: { deletedAt: { $exists: false } } }) errror 2323?3423 ;
 
       return res.status(200).json({
         message: "success",
@@ -148,7 +171,7 @@ class BlogController {
             (id) => new mongoose.Types.ObjectId(id),
           ),
           suspended: false,
-          coverImage: mainImage?.[0]?.path,
+          cover_image: mainImage?.[0]?.path,
         });
 
         await blog.save({ session });
@@ -178,10 +201,10 @@ class BlogController {
     } catch (err: unknown) {
       // 🔥 ลบไฟล์ทั้งหมดถ้า error
       const files = req.files as {
-        coverImage?: Express.Multer.File[];
+        cover_image?: Express.Multer.File[];
         image?: Express.Multer.File[];
       };
-      const allFiles = [...(files?.coverImage || []), ...(files?.image || [])];
+      const allFiles = [...(files?.cover_image || []), ...(files?.image || [])];
 
       allFiles.forEach((file) => {
         if (fs.existsSync(file.path)) {
@@ -268,10 +291,10 @@ class BlogController {
     const idBlog = req.params.id;
     const session = await mongoose.startSession();
     const files = req.files as {
-      coverImage?: Express.Multer.File[];
+      cover_image?: Express.Multer.File[];
       image?: Express.Multer.File[];
     };
-    const coverImage = files?.coverImage?.[0] || null;
+    const cover_image = files?.cover_image?.[0] || null;
     const images = files?.image || [];
     try {
       await session.withTransaction(async () => {
@@ -332,14 +355,14 @@ class BlogController {
         //   // console.log(mergedTags);
         // }
 
-        let oldCoverImage: string = "";
-        let newCoverImage: string = "";
+        let oldcover_image: string = "";
+        let newcover_image: string = "";
 
-        if (files["coverImage"]?.[0]) {
+        if (files["cover_image"]?.[0]) {
           // ค่าเดิมจาก DB
-          oldCoverImage = blogPost.coverImage?.[0] ?? "";
+          oldcover_image = blogPost.cover_image?.[0] ?? "";
           // สร้าง absolute path จาก process.cwd()
-          const absolutePath = path.join(process.cwd(), oldCoverImage);
+          const absolutePath = path.join(process.cwd(), oldcover_image);
 
           // ลบไฟล์เก่าออกถ้ามี
           if (fs.existsSync(absolutePath)) {
@@ -348,8 +371,8 @@ class BlogController {
           }
 
           // ค่าใหม่จาก Multer (ไฟล์ที่ upload เข้ามา)
-          const uploadedCover = files["coverImage"][0]; // coverImage เป็น array
-          newCoverImage = uploadedCover.path; // หรือ uploadedCover.filename ตามที่คุณเก็บ
+          const uploadedCover = files["cover_image"][0]; // cover_image เป็น array
+          newcover_image = uploadedCover.path; // หรือ uploadedCover.filename ตามที่คุณเก็บ
         }
 
         await blogPost.updateOne(
@@ -357,8 +380,8 @@ class BlogController {
             title,
             content,
             // tags: isChanged ? mergedTags : oldTags,
-            online: online === true || online === "true",
-            coverImage: newCoverImage || oldCoverImage,
+            is_online: online === true || online === "true",
+            cover_image: newcover_image || oldcover_image,
           },
           { session },
         );
@@ -382,10 +405,10 @@ class BlogController {
     } catch (err: unknown) {
       // 🔥 ลบไฟล์ทั้งหมดถ้า error
       const files = req.files as {
-        coverImage?: Express.Multer.File[];
+        cover_image?: Express.Multer.File[];
         image?: Express.Multer.File[];
       };
-      const allFiles = [...(files?.coverImage || []), ...(files?.image || [])];
+      const allFiles = [...(files?.cover_image || []), ...(files?.image || [])];
 
       allFiles.forEach((file) => {
         if (fs.existsSync(file.path)) {
@@ -404,36 +427,45 @@ class BlogController {
   static async blogTogglePost(req: Request, res: Response) {
     const blogId = req.params.id;
     const userId = req.user?.userId;
-    const session = await mongoose.startSession();
-    let newStatus: boolean = false;
-    try {
-      await session.withTransaction(async () => {
-        const blog = await Blog.findOne({
-          _id: blogId,
-          deletedAt: null,
-          user_id: userId,
-        }).session(session); // ✅ .session() แทน options object
 
-        if (!blog) {
-          throw new Error("Image not found");
-        }
-        newStatus = !blog.online;
-        await Blog.updateOne(
-          { _id: blogId }, // ✅ มี filter
-          { online: newStatus },
-          { session },
-        );
-      });
+    try {
+      const { is_online } = req.body;
+
+      if (typeof is_online !== "boolean") {
+        return res.status(400).json({
+          message: "is_online must be boolean",
+        });
+      }
+
+      const blog = await Blog.findOneAndUpdate(
+        {
+          _id: blogId,
+          user_id: userId,
+          deletedAt: null,
+        },
+        {
+          is_online,
+        },
+        {
+          new: true,
+        },
+      );
+
+      if (!blog) {
+        return res.status(404).json({
+          message: "Blog not found",
+        });
+      }
 
       return res.status(200).json({
-        message: `Blog is now ${newStatus ? "online" : "offline"}`,
+        message: `Blog is now ${blog.is_online ? "online" : "offline"}`,
+        data: blog.is_online,
       });
-    } catch (err: unknown) {
-      res.status(500).json({
-        message: err instanceof Error ? err.message : "Unknown error",
+    } catch (err: any) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err.message,
       });
-    } finally {
-      session.endSession();
     }
   }
   static async blogDeletePost(req: Request, res: Response) {

@@ -36,7 +36,7 @@ router.patch(
 router.patch(
   "/:id/toggle",
   authMiddleware,
-  // useValidation({ body: blogSchemas.toggleBlog }),
+  useValidation({ body: blogSchemas.toggleBlog }),
   BlogController.blogTogglePost,
 );
 router.delete("/:id/delete", authMiddleware, BlogController.blogDeletePost);

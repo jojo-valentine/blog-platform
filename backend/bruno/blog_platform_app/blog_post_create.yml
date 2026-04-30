@@ -26,10 +26,10 @@ http:
         type: text
         value: '["travel","food"]'
         contentType: text
-      - name: online
+      - name: is_online
         type: text
         value: "true"
-      - name: coverImage
+      - name: cover_image
         type: file
         value:
           - C:\Users\UsEr\Downloads\black-horse-in-ducilo-park-souk-al-bahar-in-dubai-free-image.webp
@@ -53,7 +53,7 @@ runtime:
       value: ""
     - name: tags
       value: ""
-    - name: online
+    - name: is_online
       value: ""
 
 settings:

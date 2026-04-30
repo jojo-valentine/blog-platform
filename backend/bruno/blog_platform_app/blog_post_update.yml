@@ -49,11 +49,11 @@ http:
         value: '["travel","food","hotal"]'
         contentType: text
         disabled: true
-      - name: online
+      - name: is_online
         type: text
         value: "true"
         disabled: true
-      - name: coverImage
+      - name: cover_image
         type: file
         value:
           - C:\Users\UsEr\Downloads\HFHBdG2bAAA_NUR.jpg

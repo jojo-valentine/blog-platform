@@ -37,7 +37,7 @@ class AdminController {
       const [blogs, total] = await Promise.all([
         Blog.find(filter)
           .select(
-            "title content coverImage tags suspended online createdAt deletedAt",
+            "title content cover_image tags suspended is_online createdAt deletedAt",
           )
           .populate({
             path: "images",

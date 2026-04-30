@@ -153,7 +153,7 @@ export const uploadAvatar = createUploadMiddleware("avatar", (req) => {
   return path.join(__dirname, `../upload/${userId}/avatar`);
 });
 // รูป cover หลักของ blog
-export const uploadBlogCover = createUploadMiddleware("coverImage", (req) => {
+export const uploadBlogCover = createUploadMiddleware("cover_image", (req) => {
   const userId = req.user?.userId;
   if (!userId) throw new Error("Unauthorized");
 
@@ -278,7 +278,7 @@ export const checkMaxBlogImages = async (
     }
 
     const files = req.files as {
-      coverImage?: Express.Multer.File[];
+      cover_image?: Express.Multer.File[];
       image?: Express.Multer.File[];
     };
     const newFilesCount = files?.image?.length || 0;
@@ -299,7 +299,7 @@ export const checkMaxBlogImages = async (
       //   }
       // }
 
-      const allFiles = [...(files?.coverImage || []), ...(files?.image || [])];
+      const allFiles = [...(files?.cover_image || []), ...(files?.image || [])];
 
       allFiles.forEach((file) => {
         if (fs.existsSync(file.path)) {
@@ -323,6 +323,6 @@ export const checkMaxBlogImages = async (
     });
   }
 };
-// ✅ ใช้ fields() รับทั้ง coverImage และ image พร้อมกัน
+// ✅ ใช้ fields() รับทั้ง cover_image และ image พร้อมกัน
 
 // const uploadImageMiddleware = createUploadMiddleware("image", uploadDirPost);

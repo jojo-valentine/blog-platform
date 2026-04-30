@@ -5,8 +5,8 @@ export interface IBlog extends Document {
   title: string;
   content: string;
   tags_id: mongoose.Types.ObjectId[];
-  coverImage?: string;
-  online: boolean;
+  cover_image?: string;
+  is_online: boolean;
   suspended: boolean;
   images: mongoose.Types.ObjectId[]; // อ้างอิงไปยัง Image
   createdAt: Date;

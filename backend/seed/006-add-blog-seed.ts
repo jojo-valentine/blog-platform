@@ -25,8 +25,8 @@ async function seedBlog() {
       title: `Blog ${index + 1} by ${u.email}`,
       content: "This is a seeded blog post.",
       tag_id: randomTypes.map((t) => t._id),
-      coverImage: [],
-      online: false,
+      cover_image: [],
+      is_online: false,
       suspended: false,
       images: [],
     }));
