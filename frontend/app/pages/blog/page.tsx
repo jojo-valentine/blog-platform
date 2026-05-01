@@ -10,7 +10,15 @@ import {
   CardTitle,
 } from "@/app/components/ui/card";
 import { motion } from "framer-motion";
-import { PenSquare, Trash2, Eye, EyeOff, Plus, Calendar ,Loader2  } from "lucide-react";
+import {
+  PenSquare,
+  Trash2,
+  Eye,
+  EyeOff,
+  Plus,
+  Calendar,
+  Loader2,
+} from "lucide-react";
 import { Switch } from "@/app/components/ui/switch";
 import { CategoryCheckBox } from "@/app/components/ui/categoryCheckBox";
 import { SearchBar } from "@/app/components/ui/searchBar";
@@ -86,6 +94,7 @@ export default function Page() {
       setLoading(false);
     }
   }, [page, debouncedSearch, selectedIds]);
+
   const fetchCategory = useCallback(async () => {
     setLoadingCategory(true);
     try {
@@ -420,7 +429,7 @@ export default function Page() {
                                   >
                                     {loadingDeleteIds.includes(blog._id) ? (
                                       <span className="flex items-center gap-1">
-                                        <Loader2  className="h-3 w-3 animate-spin" />
+                                        <Loader2 className="h-3 w-3 animate-spin" />
                                         Deleting...
                                       </span>
                                     ) : (

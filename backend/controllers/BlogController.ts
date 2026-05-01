@@ -232,8 +232,12 @@ class BlogController {
         .select("-deletedAt -createdAt -updatedAt -__v")
         .populate({
           path: "images",
-          select: "path image caption deleteAt", //-_id 🔥 กำหนด resource
-          match: { deletedAt: { $exists: false } },
+          match: { deletedAt: null },
+          select: "path ",
+        })
+        .populate({
+          path: "tags_id", // 👈 สำคัญ
+          select: "name", // เอาเฉพาะ field ที่ต้องใช้
         });
       if (!blog) {
         return res.status(404).json({
