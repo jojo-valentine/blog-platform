@@ -40,7 +40,7 @@ type ImageItem = {
   preview: string;
 };
 type Blog = {
-  main_image: File | null;
+  cover_image: File | null;
   title: string;
   categories: string[];
   content: string;
@@ -48,7 +48,7 @@ type Blog = {
 };
 
 type errorBlog = {
-  main_image: string; // error message ของ main_image
+  cover_image: string; // error message ของ cover_image
   title: string; // error message ของ title
   categories: string; // error message ของ categories
   content: string; // error message ของ content
@@ -56,7 +56,7 @@ type errorBlog = {
 };
 
 const initialBlog: Blog = {
-  main_image: null,
+  cover_image: null,
   title: "",
   categories: [] as string[],
   content: "",
@@ -64,7 +64,7 @@ const initialBlog: Blog = {
 };
 
 const initialBlogError: errorBlog = {
-  main_image: "",
+  cover_image: "",
   title: "",
   categories: "",
   content: "",
@@ -129,7 +129,7 @@ export default function Page() {
     if (!ALLOWED_TYPES.includes(file.type)) {
       setErrorBlog((prev) => ({
         ...prev,
-        main_image: "ไฟล์ต้องเป็น JPG, PNG หรือ WEBP เท่านั้น",
+        cover_image: "ไฟล์ต้องเป็น JPG, PNG หรือ WEBP เท่านั้น",
       }));
       alert("ไฟล์ต้องเป็น JPG, PNG หรือ WEBP เท่านั้น");
       return;
@@ -138,14 +138,14 @@ export default function Page() {
     if (file.size > MAX_SIZE) {
       setErrorBlog((prev) => ({
         ...prev,
-        main_image: "ไฟล์ต้องไม่เกิน 5MB",
+        cover_image: "ไฟล์ต้องไม่เกิน 5MB",
       }));
       alert("ไฟล์ต้องไม่เกิน 5MB");
       return;
     }
     setBlogForm((prev) => ({
       ...prev,
-      main_image: file,
+      cover_image: file,
     }));
     // setMainImageFile(file);
     setMainImagePreview(URL.createObjectURL(file));
@@ -221,8 +221,8 @@ export default function Page() {
       const formData = new FormData();
 
       // append mainImage (ไฟล์)
-      if (blogForm.main_image) {
-        formData.append("main_image", blogForm.main_image);
+      if (blogForm.cover_image) {
+        formData.append("cover_image", blogForm.cover_image);
       }
 
       // append title, content
@@ -342,7 +342,7 @@ export default function Page() {
                         // setMainImageFile(null);
                         setBlogForm((prev) => ({
                           ...prev,
-                          main_image: null,
+                          cover_image: null,
                         }));
                       }}
                       className="absolute top-2 right-2 rounded-full bg-foreground/70 p-1.5 text-background hover:bg-foreground transition-colors"
@@ -354,7 +354,7 @@ export default function Page() {
                   <button
                     type="button"
                     onClick={() => mainImageRef.current?.click()}
-                    className={`${errorBlog.main_image} ? inputErrorClass :  cursor-pointer w-full h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors`}
+                    className={`${errorBlog.cover_image} ? inputErrorClass :  cursor-pointer w-full h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors`}
                   >
                     <ImagePlus className="h-8 w-8" />
                     <span className="text-sm">Click to upload main image</span>
@@ -367,8 +367,8 @@ export default function Page() {
                   className={`${errorClass} ? inputErrorClass : hidden cursor-pointer `}
                   onChange={handleMainImage}
                 />
-                {errorBlog.main_image && (
-                  <p className={errorClass}>{errorBlog.main_image}</p>
+                {errorBlog.cover_image && (
+                  <p className={errorClass}>{errorBlog.cover_image}</p>
                 )}
               </CardContent>
             </Card>

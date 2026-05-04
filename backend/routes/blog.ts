@@ -28,8 +28,8 @@ router.delete("/:id/image", authMiddleware, BlogController.blogDeleteImage);
 router.patch(
   "/:id/update",
   authMiddleware,
-  checkMaxBlogImages,
   uploadBlog,
+  checkMaxBlogImages,
   useValidation({ body: blogSchemas.update }),
   BlogController.blogUpdate,
 );

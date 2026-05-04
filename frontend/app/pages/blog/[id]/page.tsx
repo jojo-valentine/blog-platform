@@ -27,6 +27,11 @@ type ImageItem = {
   file: File;
   preview: string;
 };
+type Gallery = {
+  _id: string;
+  path: string;
+};
+
 type Blog = {
   _id: string;
   title: string;
@@ -34,7 +39,7 @@ type Blog = {
   tags_id: Category[]; // ✅ แก้ตรงนี้
   cover_image: string[];
   // createdAt: string;
-  gallery: ImageItem[];
+  gallery: Gallery[];
 };
 type Category = {
   _id: string;
@@ -95,7 +100,20 @@ export default function Page() {
         withCredentials: true,
       });
       const data = res.data;
-      setBlogForm(data.data);
+      setBlogForm({
+        ...data.data,
+        title: data.data.title || "",
+        tags_id: data.data.tags_id || [],
+        cover_image: data.data.cover_image || [],
+        gallery: (data.data.images || []).map(
+          (img: { _id: string; path: string }) => ({
+            id: img._id,
+            path: `${API_URL}${img.path}`,
+          }),
+        ),
+
+        content: data.data.content || "",
+      });
 
       setMainImagePreview(data.data.cover_image?.[0] || null); // ✅ เอา index 0
     } catch (error: any) {
@@ -178,18 +196,8 @@ export default function Page() {
       ? img
       : `${API_URL}${img}`
     : undefined;
-  console.log({ preview });
-  // console.log("STATE:", blogForm.cover_image);
-  const stripHtml = (html: string) => {
-    if (typeof document === "undefined") return html;
-    const div = document.createElement("div");
-    div.innerHTML = html;
-    return div.textContent || div.innerText || "";
-  };
 
   const handleNewImages = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("test");
-
     const files = Array.from(e.target.files ?? []);
     setNewGallery((prev) => [
       ...prev,
@@ -223,6 +231,84 @@ export default function Page() {
   const handleContentChange = (val: string | undefined) => {
     setBlogForm((prev) => ({ ...prev, content: val ?? "" }));
   };
+  const handleUpdateForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = new FormData();
+    form.append("title", blogForm.title);
+    form.append("content", blogForm.content);
+    blogForm.tags_id.forEach((tag) => {
+      form.append("categories", tag._id);
+    });
+    if (newImage) {
+      form.append("cover_image", newImage);
+    }
+    if (newGallery.length > 0) {
+      newGallery.forEach((img) => {
+        form.append("gallery", img.file);
+      });
+    }
+    console.log([...form.entries()]);
+    setBlogFromUpdateLoading(true);
+    try {
+      const res = await axios.patch(`${API_URL}/api/blog/${id}/update`, form, {
+        withCredentials: true,
+      });
+      const data = res.data;
+      console.log({ data });
+
+      // setBlogForm
+      // Swal.fire({
+      //   title: "Update Successfully 🎉",
+      //   icon: "success",
+      //   showConfirmButton: true,
+      //   confirmButtonText: "Go to Blog",
+      // }).then((result) => {
+      //   if (result.isConfirmed) {
+      //     router.push("/pages/blog");
+      //   }
+      // });
+    } catch (error: any) {
+      const err = error.response?.data;
+      if (Array.isArray(err?.errors)) {
+        const fieldErrors = structuredClone(initialBlogError);
+
+        err.errors.forEach((e: { field: keyof errorBlog; message: string }) => {
+          if (e.field.startsWith("gallery")) {
+            const [, indexStr, key] = e.field.split(".");
+            const index = Number(indexStr);
+            if (isNaN(index)) return;
+
+            if (!fieldErrors.gallery) {
+              fieldErrors.gallery = [];
+            }
+            (fieldErrors.gallery[index] as any)[key] = e.message;
+          } else {
+            fieldErrors[e.field as Exclude<keyof errorBlog, "gallery">] =
+              e.message;
+          }
+        });
+        setErrorBlog(fieldErrors);
+        Swal.fire({
+          title: "Validation Error",
+          icon: "error",
+          timer: 1500,
+          showConfirmButton: false,
+          text: "Please check your inputs",
+        });
+      } else {
+        Swal.fire({
+          title: "Error",
+          icon: "error",
+          timer: 1500,
+          showConfirmButton: false,
+          text: err?.message || "Something went wrong",
+        });
+      }
+    } finally {
+      setBlogFromUpdateLoading(false);
+    }
+  };
+
   return (
     <div className="container max-w-3xl py-10 animate-fade-in">
       <Button
@@ -234,9 +320,7 @@ export default function Page() {
         <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to My Blogs
       </Button>
       <h1 className="font-heading text-3xl font-bold mb-8">Edit Blog Post</h1>
-      <form
-      // onSubmit={handleSubmit}
-      >
+      <form onSubmit={handleUpdateForm}>
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="font-heading text-lg">Main Image</CardTitle>
@@ -270,7 +354,10 @@ export default function Page() {
                   </button>
                 </>
               ) : (
-                <button onClick={() => mainImageRef.current?.click()}>
+                <button
+                  onClick={() => mainImageRef.current?.click()}
+                  type="button"
+                >
                   Upload
                 </button>
               )}
@@ -292,7 +379,12 @@ export default function Page() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Title</Label>
-              <Input value={blogForm.title} onChange={handleChange} required />
+              <Input
+                id="title"
+                value={blogForm.title}
+                onChange={handleChange}
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="content">content</Label>
@@ -323,7 +415,7 @@ export default function Page() {
                 {categories.map((cat) => (
                   <div key={cat._id} className="">
                     <input
-                      id="categories" // 👈 สำคัญ
+                      id={cat._id} // 👈 สำคัญ
                       type="checkbox"
                       value={cat._id} // 👈 ใช้ id แทน name
                       checked={blogForm.tags_id.some((c) => c._id === cat._id)}
@@ -352,27 +444,62 @@ export default function Page() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-3 mb-4">
-              {/* {newImages.map((img, i) => ( */}
-              <div
-                // key={`new-${i}`}
-                className="relative rounded-lg overflow-hidden aspect-square"
-              >
-                <img
-                  // src={img.preview}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  type="button"
-                  // onClick={() =>
-                  //   setNewImages((prev) => prev.filter((_, idx) => idx !== i))
-                  // }
-                  className="absolute top-1 right-1 rounded-full bg-foreground/70 p-1 text-background hover:bg-foreground transition-colors"
+              {blogForm.gallery.map((img, i) => (
+                <div
+                  key={`old-${i}`}
+                  className="relative rounded-lg overflow-hidden aspect-square"
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-              {/* ))} */}
+                  <img
+                    src={img.path}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    // onClick={() =>
+                    //   setNewImages((prev) => prev.filter((_, idx) => idx !== i))
+                    // }
+                    className="absolute top-1 right-1 rounded-full bg-foreground/70 p-1 text-background hover:bg-foreground transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  {/* label */}
+                  <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1 rounded">
+                    old
+                  </span>
+                </div>
+              ))}
+              {/* 🟢 รูปใหม่ */}
+
+              {newGallery.map((img, i) => (
+                <div
+                  key={`new-${i}`}
+                  className="relative rounded-lg overflow-hidden aspect-square"
+                >
+                  <img
+                    // setNewGallery
+                    src={img.preview}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNewGallery((prev) =>
+                        prev.filter((_, idx) => idx !== i),
+                      )
+                    }
+                    className="absolute top-1 right-1 rounded-full bg-foreground/70 p-1 text-background hover:bg-foreground transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  {/* label */}
+                  <span className="absolute bottom-1 left-1 text-[10px] bg-green-600 text-white px-1 rounded">
+                    new
+                  </span>
+                </div>
+              ))}
+
               <button
                 type="button"
                 onClick={() => imagesRef.current?.click()}
@@ -383,37 +510,6 @@ export default function Page() {
               </button>
             </div>
 
-            {newGallery && (
-              <div>
-                <h2>new images</h2>
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  {newGallery.map((img, i) => (
-                    <div
-                      key={`new-${i}`}
-                      className="relative rounded-lg overflow-hidden aspect-square"
-                    >
-                      <img
-                        // setNewGallery
-                        src={img.preview}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setNewGallery((prev) =>
-                            prev.filter((_, idx) => idx !== i),
-                          )
-                        }
-                        className="absolute top-1 right-1 rounded-full bg-foreground/70 p-1 text-background hover:bg-foreground transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
             <input
               ref={imagesRef}
               type="file"
@@ -424,9 +520,14 @@ export default function Page() {
             />
           </CardContent>
         </Card>
-        <Button type="submit" size="lg" disabled={loading} className="w-full">
+        <Button
+          type="submit"
+          size="lg"
+          disabled={blogFromUpdateLoading}
+          className="w-full"
+        >
           <Save className="mr-2 h-4 w-4" />
-          {loading ? "Saving..." : "Save Changes"}
+          {blogFromUpdateLoading ? "Updating..." : "Change Blog"}
         </Button>
       </form>
     </div>

@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require("uuid");
 const fs = require("fs");
 const sharp = require("sharp");
 import { Request, Response, NextFunction, response } from "express";
-import { error } from "node:console";
+import { error, log } from "node:console";
 import { file } from "zod";
 import { ImageBlog } from "../models";
 
@@ -19,7 +19,7 @@ declare global {
         permissions: string[];
       };
       multerError?: {
-        type: "multer" | "sharp" | "unknown";
+        type: "multer" | "sharp" | "unknown" | "limit";
         message: string;
         field?: string;
       };
@@ -176,7 +176,7 @@ const MAX_BLOG_IMAGES = parseInt(process.env.MAX_BLOG_IMAGES || "5");
 const uploadBlogFields = multer({
   storage: multer.memoryStorage(),
 }).fields([
-  { name: "main_image", maxCount: 1 },
+  { name: "cover_image", maxCount: 1 },
   { name: "gallery", maxCount: MAX_BLOG_IMAGES },
 ]);
 export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
@@ -195,7 +195,7 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
 
     try {
       const files = req.files as {
-        main_image?: Express.Multer.File[];
+        cover_image?: Express.Multer.File[];
         gallery?: Express.Multer.File[];
       };
       // console.log({ files: files });
@@ -211,8 +211,8 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
       // =========================
       // 1. MAIN IMAGE (single)
       // =========================
-      if (files?.main_image?.length) {
-        const cover = files["main_image"][0];
+      if (files?.cover_image?.length) {
+        const cover = files["cover_image"][0];
         const filename = `${Date.now()}-${uuidv4()}.webp`;
         const targetDir = ensureDir(
           // path.join(__dirname, `../upload/${userId}/blog/${blogId}/cover`),
@@ -222,8 +222,8 @@ export const uploadBlog = (req: Request, res: Response, next: NextFunction) => {
         const outputPath = path.join(targetDir, filename);
         const relativePath = `/upload/${userId}/blog/${blogId}/cover/${filename}`;
         await sharp(cover.buffer).jpeg({ quality: 90 }).toFile(outputPath);
-        files["main_image"][0].filename = filename;
-        files["main_image"][0].path = relativePath;
+        files["cover_image"][0].filename = filename;
+        files["cover_image"][0].path = relativePath;
       }
 
       // =========================
@@ -266,54 +266,62 @@ export const checkMaxBlogImages = async (
     const userId = req.user?.userId;
 
     if (!blogId) {
-      return res.status(400).json({
-        message: "Blog ID is required",
-      });
+      return res.status(400).json({ message: "Blog ID is required" });
     }
 
     if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const files = req.files as {
-      cover_image?: Express.Multer.File[];
-      image?: Express.Multer.File[];
-    };
-    const newFilesCount = files?.image?.length || 0;
+    // 🔥 รองรับทั้ง fields และ any()
+    let galleryFiles: Express.Multer.File[] = [];
+    let coverFiles: Express.Multer.File[] = [];
+
+    if (Array.isArray(req.files)) {
+      // 👉 upload.any()
+      galleryFiles = req.files.filter((f) => f.fieldname === "gallery");
+      coverFiles = req.files.filter((f) => f.fieldname === "cover_image");
+    } else {
+      // 👉 upload.fields()
+      const files = req.files as {
+        cover_image?: Express.Multer.File[];
+        gallery?: Express.Multer.File[];
+      };
+
+      galleryFiles = files?.gallery || [];
+      coverFiles = files?.cover_image || [];
+    }
+
+    const newFilesCount = galleryFiles.length;
+    // console.log("req.files:", req.files);
+    // console.log("isArray:", Array.isArray(req.files));
+    // console.log({
+    //   existingCount: "checking...",
+    //   newFilesCount,
+    // });
 
     const existingCount = await ImageBlog.countDocuments({
       blog_id: blogId,
       deletedAt: null,
     });
-    console.log({ existingCount: existingCount, newFilesCount: newFilesCount });
 
     if (existingCount + newFilesCount > MAX_BLOG_IMAGES) {
-      // ✅ ลบไฟล์ที่ upload มาแล้วทิ้ง
-      // if (files?.image?.length) {
-      //   for (const file of files.image) {
-      //     if (file.path && fs.existsSync(file.path)) {
-      //       fs.unlinkSync(file.path);
-      //     }
-      //   }
-      // }
-
-      const allFiles = [...(files?.cover_image || []), ...(files?.image || [])];
+      // 🔥 ลบไฟล์ทั้งหมดที่ upload มา
+      const allFiles = [...galleryFiles, ...coverFiles];
 
       allFiles.forEach((file) => {
-        if (fs.existsSync(file.path)) {
+        if (file.path && fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
       });
 
       req.multerError = {
-        type: "sharp",
-        field: "image",
+        type: "limit",
+        field: "gallery",
         message: `Max ${MAX_BLOG_IMAGES} images allowed`,
       };
 
-      return next(); // 🔥 สำคัญ
+      return next();
     }
 
     return next();

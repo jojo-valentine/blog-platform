@@ -152,10 +152,10 @@ class BlogController {
 
       const files = req.files as {
         gallery?: Express.Multer.File[];
-        main_image?: Express.Multer.File[];
+        cover_image?: Express.Multer.File[];
       };
       const images = files?.gallery || [];
-      const mainImage = files?.main_image || [];
+      const coverImage = files?.cover_image || [];
       const blogId = (req as any).blogId.toString();
 
       let newBlog: any = null;
@@ -171,7 +171,7 @@ class BlogController {
             (id) => new mongoose.Types.ObjectId(id),
           ),
           suspended: false,
-          cover_image: mainImage?.[0]?.path,
+          cover_image: coverImage?.[0]?.path,
         });
 
         await blog.save({ session });
@@ -296,104 +296,69 @@ class BlogController {
     const session = await mongoose.startSession();
     const files = req.files as {
       cover_image?: Express.Multer.File[];
-      image?: Express.Multer.File[];
+      gallery?: Express.Multer.File[];
     };
-    const cover_image = files?.cover_image?.[0] || null;
-    const images = files?.image || [];
+    const gallery = files.gallery || [];
+
+    // เก็บไว้ลบทีหลัง (หลัง commit)
+    let oldCoverToDelete = "";
+
+    const parseTags = (tags: any): string[] => {
+      if (Array.isArray(tags)) return tags;
+      if (typeof tags === "string") {
+        try {
+          const parsed = JSON.parse(tags);
+          if (Array.isArray(parsed)) return parsed;
+        } catch {}
+        if (tags.includes("'")) {
+          return tags
+            .replace(/'/g, "")
+            .split(",")
+            .map((t: any) => t.trim());
+        }
+        return tags.split(",").map((t: any) => t.trim());
+      }
+      return [];
+    };
+
     try {
       await session.withTransaction(async () => {
-        const { title, content, tags, online } = req.body;
+        const { title, content, categories } = req.body;
 
         const blogPost = await Blog.findOne({
           _id: idBlog,
           deletedAt: null,
           user_id: userId,
         }).session(session);
-        if (!blogPost) {
-          throw new Error("Blog not found");
-        }
 
-        const parseTags = (tags: any): string[] => {
-          // 👉 ถ้าเป็น array อยู่แล้ว
-          if (Array.isArray(tags)) {
-            return tags;
-          }
+        if (!blogPost) throw new Error("Blog not found");
 
-          if (typeof tags === "string") {
-            try {
-              const parsed = JSON.parse(tags);
-              if (Array.isArray(parsed)) {
-                return parsed;
-              }
-            } catch (error) {
-              // ignore
-            }
-            // 2. กรณี 'travel','food'
-            if (tags.includes("'")) {
-              return tags
-                .replace(/'/g, "") //ลบ'
-                .split(",")
-                .map((t: any) => t.trim());
-            }
-            // 3. กรณี travel,food
-            return tags.split(",").map((t: any) => t.trim());
-          }
+        const hasNewCover = !!files.cover_image?.[0];
 
-          return []; // default fallback
-        };
-        // const oldTags = parseTags(blogPost.tags ?? "");
-        // const newTags = parseTags(req.body.tags ?? "");
-        // let mergedTags: string[] = [];
-        // // 2. เทียบว่ามีการเปลี่ยนแปลงหรือไม่
-        // const isChanged =
-        //   oldTags.length !== newTags.length ||
-        //   oldTags.some((tag) => !newTags.includes(tag));
-        // if (isChanged) {
-        //   // // 3. หา tag ที่เพิ่มเข้ามา
-        //   const addedTags = newTags.filter((tag) => !oldTags.includes(tag));
-        //   // ✅ merge แล้ว dedup ด้วย Set
-        //   // const mergedTags = [...new Set([...oldTags, ...newTags])];
-        //   const oldTagsSet = new Set(oldTags);
-        //   addedTags.forEach((tag) => oldTagsSet.add(tag));
-        //   mergedTags = Array.from(oldTagsSet);
-        //   // console.log(mergedTags);
-        // }
+        let coverImage: string[] = Array.isArray(blogPost.cover_image)
+          ? blogPost.cover_image
+          : [];
 
-        let oldcover_image: string = "";
-        let newcover_image: string = "";
-
-        if (files["cover_image"]?.[0]) {
-          // ค่าเดิมจาก DB
-          oldcover_image = blogPost.cover_image?.[0] ?? "";
-          // สร้าง absolute path จาก process.cwd()
-          const absolutePath = path.join(process.cwd(), oldcover_image);
-
-          // ลบไฟล์เก่าออกถ้ามี
-          if (fs.existsSync(absolutePath)) {
-            fs.unlinkSync(absolutePath);
-            // console.log("Old cover image deleted:", absolutePath);
-          }
-
-          // ค่าใหม่จาก Multer (ไฟล์ที่ upload เข้ามา)
-          const uploadedCover = files["cover_image"][0]; // cover_image เป็น array
-          newcover_image = uploadedCover.path; // หรือ uploadedCover.filename ตามที่คุณเก็บ
+        if (hasNewCover) {
+          const uploaded = files.cover_image![0];
+          // ✅ เก็บ path เก่าไว้ลบทีหลัง ไม่ลบใน transaction
+          oldCoverToDelete = blogPost.cover_image?.[0] || "";
+          coverImage = [uploaded.path];
         }
 
         await blogPost.updateOne(
           {
             title,
             content,
-            // tags: isChanged ? mergedTags : oldTags,
-            is_online: online === true || online === "true",
-            cover_image: newcover_image || oldcover_image,
+            tags_id: parseTags(categories),
+            cover_image: coverImage,
           },
           { session },
         );
 
-        let createdImages: IImageBlog[] = [];
-        if (files["image"] || images.length > 0) {
-          createdImages = await ImageBlog.insertMany(
-            images.map((img) => ({
+        if (gallery.length > 0) {
+          await ImageBlog.insertMany(
+            gallery.map((img) => ({
               blog_id: blogPost._id,
               path: img.path,
               uploadedBy: userId,
@@ -401,24 +366,37 @@ class BlogController {
             { session },
           );
         }
-        // await Blog
       });
-      return res.status(200).json({
-        message: "update successs",
-      });
-    } catch (err: unknown) {
-      // 🔥 ลบไฟล์ทั้งหมดถ้า error
-      const files = req.files as {
-        cover_image?: Express.Multer.File[];
-        image?: Express.Multer.File[];
-      };
-      const allFiles = [...(files?.cover_image || []), ...(files?.image || [])];
 
-      allFiles.forEach((file) => {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
+      // ✅ ลบรูปเก่าหลัง commit สำเร็จ
+      if (oldCoverToDelete) {
+        const absolutePath = path.join(
+          process.cwd(),
+          oldCoverToDelete.replace(/^\//, ""),
+        );
+        try {
+          if (fs.existsSync(absolutePath)) fs.unlinkSync(absolutePath);
+        } catch (err) {
+          console.error("Delete old cover error:", err);
         }
+      }
+
+      return res.status(200).json({ message: "update success" });
+    } catch (err: unknown) {
+      // ✅ ลบไฟล์ใหม่ที่ upload มาถ้า transaction fail
+      const allFiles = [
+        ...(files?.cover_image || []),
+        ...(files?.gallery || []),
+      ];
+      allFiles.forEach((file) => {
+        try {
+          if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        } catch {}
       });
+
+      if (err instanceof Error && err.message === "Blog not found") {
+        return res.status(404).json({ message: "Blog not found" });
+      }
 
       return res.status(500).json({
         message: "Server error",

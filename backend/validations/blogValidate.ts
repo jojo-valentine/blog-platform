@@ -31,7 +31,7 @@ export const blogSchemas = {
     title: fields.title.optional(),
     content: fields.content.optional(),
     categories: fields.categories,
-    is_online: fields.is_online,
+    // is_online: fields.is_online,
   }),
 
   toggleBlog: z.object({
