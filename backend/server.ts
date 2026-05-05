@@ -46,7 +46,7 @@ app.use(
       }
     },
     credentials: true, // 🔥 สำคัญมาก (ใช้ cookie ต้องมี)
-  })
+  }),
 );
 // ใช้ routes
 app.use("/api", apiRoutes);

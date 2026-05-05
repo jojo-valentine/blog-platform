@@ -2,7 +2,7 @@
 import { TextareaHTMLAttributes, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { motion } from "framer-motion";
-import { Plus, Calendar, ImagePlus, X, Save } from "lucide-react";
+import { ArrowBigLeft, ImagePlus, X, Save } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textarea";
@@ -312,7 +312,7 @@ export default function Page() {
           <h1 className="font-heading text-3xl font-bold">My Blogs</h1>
           <Button asChild>
             <Link href="/pages/blog/">
-              <Plus className="mr-1.5 h-4 w-4" /> back
+              <ArrowBigLeft className="mr-1.5 h-4 w-4" />  Back to My Blogs
             </Link>
           </Button>
         </div>
@@ -391,14 +391,7 @@ export default function Page() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="content">content</Label>
-                  {/* <Textarea
-                    id="content"
-                    placeholder="Write your blog content..."
-                    value={blogForm.content}
-                    onChange={handleChange}
-                    rows={12}
-                    required
-                  /> */}
+
                   <QuillEditor
                     value={blogForm.content}
                     onChange={handleContentChange}
@@ -421,24 +414,43 @@ export default function Page() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="detail">type category</Label>
-                  <div className="flex flex-wrap  gap-3">
-                    {categories.map((cat) => (
-                      <div key={cat._id} className="">
-                        <input
-                          id="categories" // 👈 สำคัญ
-                          type="checkbox"
-                          value={cat._id} // 👈 ใช้ id แทน name
-                          checked={blogForm.categories.includes(cat._id)} // 👈 sync state
-                          onChange={handleChange}
-                        />
+                  <div className="flex flex-wrap gap-3">
+                    {categories.map((cat) => {
+                      const checked = blogForm.categories.includes(cat._id);
+
+                      return (
                         <label
-                          htmlFor=""
-                          className="select-none ms-2 text-sm font-medium text-heading"
+                          key={cat._id}
+                          htmlFor={`cat-${cat._id}`}
+                          className={`cursor-pointer px-3 py-2 rounded-lg border transition flex items-center gap-2
+          ${
+            checked
+              ? "bg-primary text-white border-primary"
+              : "bg-background border-muted hover:border-foreground/30"
+          }`}
                         >
-                          {cat.name}
+                          <input
+                            id={`cat-${cat._id}`} // ✅ unique
+                            type="checkbox"
+                            value={cat._id}
+                            checked={checked}
+                            onChange={handleChange}
+                            className="hidden" // 🔥 ซ่อน checkbox
+                          />
+
+                          {/* optional icon */}
+                          <span
+                            className={`w-4 h-4 rounded border flex items-center justify-center text-xs
+            ${checked ? "bg-white text-primary" : ""}
+          `}
+                          >
+                            {checked && "✓"}
+                          </span>
+
+                          <span className="text-sm">{cat.name}</span>
                         </label>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {errorBlog.categories && (
                     <p className={errorClass}>{errorBlog.categories}</p>

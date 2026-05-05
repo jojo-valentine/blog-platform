@@ -41,4 +41,7 @@ router.patch(
 );
 router.delete("/:id/delete", authMiddleware, BlogController.blogDeletePost);
 
+router.get("/home", BlogController.blogHome);
+router.get("/public", BlogController.blogPublicList);
+router.get("/:id/detail", BlogController.blogDetail);
 export default router;

@@ -352,7 +352,7 @@ export default function Page() {
                             dangerouslySetInnerHTML={{ __html: blog.content }}
                           /> */}
                           <div>
-                            <div className=" line-clamp-2">
+                            <div className="break-all line-clamp-2">
                               {stripHtml(blog.content)}
                             </div>
                           </div>
@@ -373,7 +373,7 @@ export default function Page() {
                                 disabled={loadingToggleIds.includes(blog._id)}
                               />
 
-                              <span className="text-xs text-muted-foreground min-w-[70px]">
+                              <span className="text-xs text-muted-foreground min-w-[70px] cursor-pointer">
                                 {loadingToggleIds.includes(blog._id)
                                   ? "Updating..."
                                   : blog.is_online
@@ -388,6 +388,7 @@ export default function Page() {
                               onClick={() =>
                                 router.push(`/pages/blog/${blog._id}`)
                               }
+                              className="cursor-pointer"
                             >
                               <PenSquare className="h-4 w-4" />
                             </Button>
@@ -396,7 +397,7 @@ export default function Page() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="text-destructive hover:text-destructive"
+                                  className="text-destructive hover:text-destructive cursor-pointer"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>

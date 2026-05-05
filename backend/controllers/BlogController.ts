@@ -478,6 +478,150 @@ class BlogController {
       session.endSession();
     }
   }
+  // ================================
+  // 1. หน้าแรก — แสดงสูงสุด 6 post (online เท่านั้น)
+  // ================================
+  static async blogHome(req: Request, res: Response) {
+    try {
+      const blogs = await Blog.find({
+        deletedAt: null,
+        is_online: true,
+      })
+        .select("title content tags_id cover_image createdAt")
+        .populate({ path: "tags_id", select: "name" })
+        .populate({
+          path: "user_id",
+          select: "name",
+          populate: { path: "profile", select: "display_name" },
+        })
+        .sort({ createdAt: -1 })
+        .limit(7)
+        .lean();
+
+      return res.status(200).json({
+        message: "success",
+        data: blogs,
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
+
+  // ================================
+  // 2. Blog ทั้งหมด + pagination + search + category
+  // ================================
+  static async blogPublicList(req: Request, res: Response) {
+    try {
+      const page = Math.max(Number(req.query.page) || 1, 1);
+      const limit = Math.min(Number(req.query.limit) || 10, 50);
+      const skip = (page - 1) * limit;
+      const q = (req.query.search as string)?.trim();
+
+      const filter: any = {
+        deletedAt: null,
+        is_online: true,
+      };
+
+      // category filter
+      const categoryRaw = req.query.category || req.query["category[]"];
+      const category = Array.isArray(categoryRaw)
+        ? categoryRaw
+        : typeof categoryRaw === "string"
+          ? categoryRaw.split(",").filter(Boolean)
+          : [];
+
+      if (category.length > 0) {
+        filter.tags_id = { $all: category };
+      }
+
+      // search filter
+      if (q) {
+        const orConditions: any[] = [
+          { title: { $regex: q, $options: "i" } },
+          { content: { $regex: q, $options: "i" } },
+        ];
+        if (mongoose.Types.ObjectId.isValid(q)) {
+          orConditions.push({ _id: new mongoose.Types.ObjectId(q) });
+        }
+        filter.$or = orConditions;
+      }
+
+      const [blogs, total] = await Promise.all([
+        Blog.find(filter)
+          .select("title content tags_id cover_image createdAt")
+          .populate({ path: "tags_id", select: "name" })
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Blog.countDocuments(filter),
+      ]);
+
+      return res.status(200).json({
+        message: "success",
+        data: blogs,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
+
+  // ================================
+  // 3. Blog detail — เฉพาะ online และยังไม่ลบ
+  // ================================
+  static async blogDetail(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      // ถ้า id เป็น array → ใช้ตัวแรก
+      const blogId = Array.isArray(id) ? id[0] : id;
+
+      if (!mongoose.Types.ObjectId.isValid(blogId)) {
+        return res.status(400).json({ message: "Invalid blog id" });
+      }
+
+      const blog = await Blog.findOne({
+        _id: id,
+        deletedAt: null,
+        is_online: true,
+      })
+        .select("title content tags_id cover_image createdAt user_id")
+        .populate({ path: "tags_id", select: "name" })
+        .populate({ path: "user_id", select: "name avatar" })
+        .populate({
+          path: "images",
+          match: { deletedAt: null },
+          select: "path",
+        })
+        .lean();
+
+      if (!blog) {
+        return res.status(404).json({ message: "Blog not found" });
+      }
+
+      return res.status(200).json({
+        message: "success",
+        data: blog,
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
 }
 
 export default BlogController;

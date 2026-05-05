@@ -2,7 +2,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { motion } from "framer-motion";
-import { Plus, Calendar, ImagePlus, X, Save, ArrowLeft } from "lucide-react";
+import { ArrowBigLeft, ImagePlus, X, Save, ArrowLeft } from "lucide-react";
+
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textarea";
@@ -19,6 +20,7 @@ import { API_URL } from "@/app/lib/config";
 import Swal from "sweetalert2";
 import dynamic from "next/dynamic";
 import "react-quill-new/dist/quill.snow.css";
+import Link from "next/link";
 const QuillEditor = dynamic(() => import("react-quill-new"), {
   ssr: false,
 });
@@ -91,6 +93,7 @@ export default function Page() {
   const [newImage, setNewImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [newGallery, setNewGallery] = useState<ImageItem[]>([]);
+  const [deletingIds, setDeletingIds] = useState<string[]>([]);
 
   const fetchBlogEdit = useCallback(async () => {
     try {
@@ -107,7 +110,7 @@ export default function Page() {
         cover_image: data.data.cover_image || [],
         gallery: (data.data.images || []).map(
           (img: { _id: string; path: string }) => ({
-            id: img._id,
+            _id: img._id,
             path: `${API_URL}${img.path}`,
           }),
         ),
@@ -254,19 +257,22 @@ export default function Page() {
         withCredentials: true,
       });
       const data = res.data;
-      console.log({ data });
+      // console.log({ data });
 
-      // setBlogForm
-      // Swal.fire({
-      //   title: "Update Successfully 🎉",
-      //   icon: "success",
-      //   showConfirmButton: true,
-      //   confirmButtonText: "Go to Blog",
-      // }).then((result) => {
-      //   if (result.isConfirmed) {
-      //     router.push("/pages/blog");
-      //   }
-      // });
+      Swal.fire({
+        title: "Update Successfully 🎉",
+        text: "Your blog has been updated.",
+        icon: "success",
+        showCancelButton: true,
+        cancelButtonColor: "#d33",
+        confirmButtonColor: "#3085d6",
+        confirmButtonText: "Go to Blog",
+        cancelButtonText: "Stay Here",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          router.push("/pages/blog");
+        }
+      });
     } catch (error: any) {
       const err = error.response?.data;
       if (Array.isArray(err?.errors)) {
@@ -308,17 +314,71 @@ export default function Page() {
       setBlogFromUpdateLoading(false);
     }
   };
+  const handleDeleteImage = async (imageId: string) => {
+    if (!imageId || deletingIds.includes(imageId)) return;
+    Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setDeletingIds((prev) => [...prev, imageId]);
+        const prevGallery = blogForm.gallery;
 
+        try {
+          const res = await axios.delete(
+            `${API_URL}/api/blog/${imageId}/image`,
+            {
+              withCredentials: true,
+            },
+          );
+
+          setBlogForm((prev) => ({
+            ...prev,
+            gallery: prev.gallery.filter((img) => img._id !== imageId),
+          }));
+
+          Swal.fire({
+            title: "Deleted!",
+            text: "Image deleted successfully.",
+            icon: "success",
+            confirmButtonColor: "#3085d6",
+            confirmButtonText: "OK",
+          });
+        } catch (error) {
+          setBlogForm((prev) => ({
+            ...prev,
+            gallery: prevGallery,
+          }));
+
+          Swal.fire({
+            title: "Error",
+            text: "There was a problem deleting the image.",
+            icon: "error",
+            confirmButtonColor: "#d33",
+            confirmButtonText: "Close",
+          });
+        } finally {
+          setDeletingIds((prev) => prev.filter((id) => id !== imageId));
+        }
+      }
+    });
+  };
+
+  const errorClass = "text-sm text-red-500 mt-1";
+  const inputErrorClass = "border-red-500 focus-visible:ring-red-500";
   return (
     <div className="container max-w-3xl py-10 animate-fade-in">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mb-6"
-        onClick={() => router.push("/pages/blog")}
-      >
-        <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to My Blogs
+      <Button asChild>
+        <Link href="/pages/blog">
+          <ArrowBigLeft className="mr-1.5 h-4 w-4" /> Back to My Blogs
+        </Link>
       </Button>
+
       <h1 className="font-heading text-3xl font-bold mb-8">Edit Blog Post</h1>
       <form onSubmit={handleUpdateForm}>
         <Card className="mb-6">
@@ -329,7 +389,14 @@ export default function Page() {
             <div className="relative">
               {imageSrc ? (
                 <>
-                  <img src={imageSrc} className="w-full h-64 object-cover" />
+                  <img
+                    src={imageSrc}
+                    className="w-full h-64 object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src =
+                        "/default/fallback/default-placeholder.png";
+                    }}
+                  />
 
                   {newImage && (
                     <button
@@ -339,7 +406,9 @@ export default function Page() {
                         setPreview(null);
                         setNewImage(null);
                       }}
-                      className="absolute top-2 right-2 rounded-full bg-foreground/70 p-1.5 text-background hover:bg-foreground transition-colors"
+                      className={`absolute top-2 right-2 rounded-full bg-foreground/70 p-1.5 text-background ${
+                        errorBlog.cover_image ? inputErrorClass : ""
+                      }`}
                     >
                       <X className="h-4 w-4 cursor-pointer" />
                     </button>
@@ -348,17 +417,23 @@ export default function Page() {
                   <button
                     type="button"
                     onClick={() => mainImageRef.current?.click()}
-                    className="absolute bottom-2 right-2 bg-black/60 text-white px-3 py-1 rounded"
+                    className={`absolute bottom-2 right-2 bg-black/60 text-white px-3 py-1 rounded cursor-pointer ${
+                      errorBlog.cover_image ? inputErrorClass : ""
+                    }`}
                   >
                     Change
                   </button>
                 </>
               ) : (
                 <button
-                  onClick={() => mainImageRef.current?.click()}
                   type="button"
+                  onClick={() => mainImageRef.current?.click()}
+                  className={`cursor-pointer w-full h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors ${
+                    errorBlog.cover_image ? inputErrorClass : ""
+                  }`}
                 >
-                  Upload
+                  <ImagePlus className="h-8 w-8" />
+                  <span className="text-sm">Click to upload main image</span>
                 </button>
               )}
 
@@ -403,36 +478,57 @@ export default function Page() {
                   ],
                 }}
                 style={{ height: "300px", marginBottom: "50px" }}
-                // className={`${errorBlog.content} ? inputErrorClass : ""`}
+                className={`${errorBlog.content} ? inputErrorClass : ""`}
               />
-              {/* {errorBlog.content && (
+              {errorBlog.content && (
                 <p className={errorClass}>{errorBlog.content}</p>
-              )} */}
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="detail">type category</Label>
               <div className="flex flex-wrap  gap-3">
-                {categories.map((cat) => (
-                  <div key={cat._id} className="">
-                    <input
-                      id={cat._id} // 👈 สำคัญ
-                      type="checkbox"
-                      value={cat._id} // 👈 ใช้ id แทน name
-                      checked={blogForm.tags_id.some((c) => c._id === cat._id)}
-                      onChange={handleChange}
-                    />
+                {categories.map((cat) => {
+                  const checked = blogForm.tags_id.some(
+                    (c) => c._id === cat._id,
+                  );
+
+                  return (
                     <label
-                      htmlFor=""
-                      className="select-none ms-2 text-sm font-medium text-heading"
+                      key={cat._id}
+                      htmlFor={`cat-${cat._id}`}
+                      className={`cursor-pointer px-3 py-2 rounded-lg border transition flex items-center gap-2
+          ${
+            checked
+              ? "bg-primary text-white border-primary"
+              : "bg-background border-muted hover:border-foreground/30"
+          }`}
                     >
-                      {cat.name}
+                      <input
+                        id={`cat-${cat._id}`} // ✅ unique
+                        type="checkbox"
+                        value={cat._id}
+                        checked={checked}
+                        onChange={handleChange}
+                        className="hidden" // 🔥 ซ่อน checkbox
+                      />
+
+                      {/* optional icon */}
+                      <span
+                        className={`w-4 h-4 rounded border flex items-center justify-center text-xs
+            ${checked ? "bg-white text-primary" : ""}
+          `}
+                      >
+                        {checked && "✓"}
+                      </span>
+
+                      <span className="text-sm">{cat.name}</span>
                     </label>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              {/* {errorBlog.categories && (
+              {errorBlog.categories && (
                 <p className={errorClass}>{errorBlog.categories}</p>
-              )} */}
+              )}
             </div>
           </CardContent>
         </Card>
@@ -444,31 +540,39 @@ export default function Page() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-3 mb-4">
-              {blogForm.gallery.map((img, i) => (
-                <div
-                  key={`old-${i}`}
-                  className="relative rounded-lg overflow-hidden aspect-square"
-                >
-                  <img
-                    src={img.path}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    // onClick={() =>
-                    //   setNewImages((prev) => prev.filter((_, idx) => idx !== i))
-                    // }
-                    className="absolute top-1 right-1 rounded-full bg-foreground/70 p-1 text-background hover:bg-foreground transition-colors"
+              {blogForm.gallery.map((img, i) => {
+                // console.log(blogForm.gallery.map((i) => i._id));
+                const isDeleting = deletingIds.includes(img._id);
+                return (
+                  <div
+                    key={img._id}
+                    className="relative rounded-lg overflow-hidden aspect-square"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                  {/* label */}
-                  <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1 rounded">
-                    old
-                  </span>
-                </div>
-              ))}
+                    <img
+                      key={`${img._id}-${i}`}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      src={`${img.path}`}
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          "/default/fallback/default-placeholder.png";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteImage(img._id)}
+                      className="absolute top-1 right-1 rounded-full bg-foreground/70 p-1 text-background hover:bg-foreground transition-colors cursor-pointer"
+                    >
+                      {isDeleting ? "..." : <X className="h-3 w-3" />}
+                    </button>
+                    {/* label */}
+                    <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1 rounded">
+                      old
+                    </span>
+                  </div>
+                );
+              })}
+
               {/* 🟢 รูปใหม่ */}
 
               {newGallery.map((img, i) => (
@@ -489,7 +593,7 @@ export default function Page() {
                         prev.filter((_, idx) => idx !== i),
                       )
                     }
-                    className="absolute top-1 right-1 rounded-full bg-foreground/70 p-1 text-background hover:bg-foreground transition-colors"
+                    className="cursor-pointer absolute top-1 right-1 rounded-full bg-foreground/70 p-1 text-background hover:bg-foreground transition-colors"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -503,7 +607,7 @@ export default function Page() {
               <button
                 type="button"
                 onClick={() => imagesRef.current?.click()}
-                className="aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
+                className="cursor-pointer aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
               >
                 <ImagePlus className="h-5 w-5" />
                 <span className="text-xs">Add</span>
@@ -518,6 +622,9 @@ export default function Page() {
               className="hidden"
               onChange={handleNewImages}
             />
+            {errorBlog.gallery && (
+              <p className={errorClass}>{errorBlog.gallery}</p>
+            )}
           </CardContent>
         </Card>
         <Button
