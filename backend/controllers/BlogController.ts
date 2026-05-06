@@ -599,7 +599,11 @@ class BlogController {
       })
         .select("title content tags_id cover_image createdAt user_id")
         .populate({ path: "tags_id", select: "name" })
-        .populate({ path: "user_id", select: "name avatar" })
+        .populate({
+          path: "user_id",
+          select: "name",
+          populate: { path: "profile", select: "display_name avatar" },
+        })
         .populate({
           path: "images",
           match: { deletedAt: null },

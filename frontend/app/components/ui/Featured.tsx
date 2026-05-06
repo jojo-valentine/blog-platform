@@ -36,6 +36,9 @@ export default function Featured({
             "group-hover:scale-105",
             imageClassName,
           )}
+          onError={(e) => {
+            e.currentTarget.src = "/default/fallback/default-placeholder.png";
+          }}
         />
 
         {/* 🔥 Overlay */}

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-
+@plugin "@tailwindcss/typography";
 @theme {                          /* ลบ inline ออก */
   --color-background: hsl(222 84% 4.9%);
   --color-foreground: hsl(210 40% 98%);
