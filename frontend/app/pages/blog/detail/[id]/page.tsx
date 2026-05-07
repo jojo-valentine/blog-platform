@@ -1,14 +1,8 @@
 "use client";
-import React, { useCallback } from "react";
+import { useCallback } from "react";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/app/components/ui/card";
 import { ArrowLeft, Calendar } from "lucide-react";
 import BlogHeroSkeleton from "@/app/components/skeleton/blog-detail/hero-skeleton";
 import BlogHeaderSkeleton from "@/app/components/skeleton/blog-detail/header-skeleton";
@@ -49,27 +43,12 @@ type Category = {
   name: string;
 };
 
-const initialBlog: Blog = {
-  title: "",
-  content: "",
-  tags_id: [],
-  cover_image: [],
-  gallery: [],
-  createdAt: "",
-  user_id: {
-    username: "",
-    profile: {
-      avatar: "",
-      display_name: "",
-    },
-  },
-};
-
-export default function page() {
+export default function Page() {
   const { id } = useParams<{ id: string }>();
   const [blog, setBlog] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -108,12 +87,19 @@ export default function page() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-  const stripHtml = (html: string) => {
-    if (typeof document === "undefined") return html;
-    const div = document.createElement("div");
-    div.innerHTML = html;
-    return div.textContent || div.innerText || "";
-  };
+
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        <div className="w-16 h-4 bg-muted rounded animate-pulse" />
+
+        <BlogHeroSkeleton />
+        <BlogHeaderSkeleton />
+        <BlogContentSkeleton />
+        <BlogGallerySkeleton />
+      </div>
+    );
+  }
   if (!blog)
     return (
       <div className="container py-10 text-center">
@@ -121,6 +107,19 @@ export default function page() {
         <Button onClick={() => router.push("/")}>Go Home</Button>
       </div>
     );
+
+  const getImageSrc = (
+    path?: string,
+    fallback = "/default/fallback/default-placeholder.png",
+  ) => {
+    if (!path) return fallback;
+
+    if (path.startsWith("http") || path.startsWith("blob")) {
+      return path;
+    }
+
+    return `${API_URL}${path}`;
+  };
 
   return (
     <>
@@ -136,8 +135,8 @@ export default function page() {
         </div>
       ) : (
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 30, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.4 }}
           className="w-full p-6 rounded-xl shadow-lg"
         >
@@ -152,20 +151,16 @@ export default function page() {
             </Button>
             {blog.cover_image && (
               <img
-                src={
-                  blog.cover_image?.[0]
-                    ? blog.cover_image?.[0].startsWith("http") ||
-                      blog.cover_image?.[0].startsWith("blob")
-                      ? blog.cover_image?.[0]
-                      : `${API_URL}${blog.cover_image?.[0]}`
-                    : undefined
-                }
+                src={getImageSrc(blog.cover_image?.[0])}
                 alt={blog.title}
-                className="w-full aspect-[4/3] object-cover rounded-lg mb-8"
+                className="w-full aspect-[16/9] object-cover rounded-2xl mb-8 shadow-xl transition-transform duration-700 hover:scale-[1.01] "
                 onError={(e) => {
                   e.currentTarget.src =
                     "/default/fallback/default-placeholder.png";
                 }}
+                onClick={() =>
+                  setSelectedImage(getImageSrc(blog.cover_image?.[0]))
+                }
               />
             )}
             <h1 className="font-heading text-4xl font-bold mb-4 text-balance">
@@ -189,15 +184,10 @@ export default function page() {
             <div className="flex items-center gap-3 mb-8 pb-8 border-b">
               <Avatar className="h-10 w-10">
                 <AvatarImage
-                  src={
-                    blog.user_id.profile?.avatar &&
-                    (blog.user_id.profile.avatar.startsWith("http") ||
-                      blog.user_id.profile.avatar.startsWith("blob"))
-                      ? blog.user_id.profile.avatar
-                      : blog.user_id.profile?.avatar
-                        ? `${API_URL}${blog.user_id.profile.avatar}`
-                        : undefined
-                  }
+                  src={getImageSrc(
+                    blog.user_id.profile?.avatar,
+                    "/default/avatar.png",
+                  )}
                 />
                 <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
                   {(blog.user_id.profile?.display_name ?? "A")
@@ -220,22 +210,48 @@ export default function page() {
               </div>
             </div>
             <div
-              className="prose dark:prose-invert max-w-none"
+              className="prose dark:prose-invert max-w-none prose-img:rounded-xl prose-img:shadow-lg prose-a:text-primary prose-headings:font-head ingprose-p:leading-8"
               dangerouslySetInnerHTML={{
                 __html: blog.content,
               }}
             />
             {blog.gallery && blog.gallery.length > 0 && (
-              <div className="mt-10">
+              <motion.div
+                initial="hidden"
+                animate="show"
+                variants={{
+                  hidden: {},
+                  show: {
+                    transition: {
+                      staggerChildren: 0.08,
+                    },
+                  },
+                }}
+                className="mt-10"
+              >
                 <h2 className="font-heading text-xl font-semibold mb-4">
                   Gallery
                 </h2>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {blog.gallery.map((img) => (
-                    <div
+                    <motion.div
                       key={img._id}
-                      className="group overflow-hidden rounded-lg"
+                      variants={{
+                        hidden: { opacity: 0, y: 30 },
+                        show: { opacity: 1, y: 0 },
+                      }}
+                      transition={{ duration: 0.5 }}
+                      whileHover={{ y: -4 }}
+                      onClick={() =>
+                        setSelectedImage(
+                          img.path.startsWith("http") ||
+                            img.path.startsWith("blob")
+                            ? img.path
+                            : `${API_URL}${img.path}`,
+                        )
+                      }
+                      className="group relative overflow-hidden rounded-xl cursor-pointer "
                     >
                       <img
                         src={
@@ -245,18 +261,65 @@ export default function page() {
                             : `${API_URL}${img.path}`
                         }
                         alt=""
-                        className="rounded-lg w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="w-full aspect-square object-cover transition-transform duration-500 ease-out group-hover:scale-110 will-change-transform"
                         onError={(e) => {
                           e.currentTarget.src =
                             "/default/fallback/default-placeholder.png";
                         }}
                       />
-                    </div>
+
+                      {/* 🔥 overlay */}
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition duration-300" />
+                      {/* 🔥 shine effect */}
+                      <div className=" absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                    </motion.div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
           </article>
+        </motion.div>
+      )}
+      {selectedImage && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setSelectedImage(null)}
+          className="
+          fixed inset-0 z-50
+          bg-black/80 backdrop-blur-sm
+          flex items-center justify-center
+          p-4
+        "
+        >
+          <motion.img
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.25 }}
+            src={selectedImage}
+            alt=""
+            className="
+            max-h-[90vh]
+            max-w-[90vw]
+            rounded-xl
+            shadow-2xl
+            object-contain
+          "
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* close button */}
+          <button
+            onClick={() => setSelectedImage(null)}
+            className="
+            absolute top-4 right-4
+            text-white text-3xl
+            hover:scale-110 transition
+          "
+          >
+            ✕
+          </button>
         </motion.div>
       )}
     </>

@@ -7,6 +7,22 @@ type Props = {
 
   onValueChange: (page: number) => void;
 } & React.HTMLAttributes<HTMLDivElement>;
+const getPages = (current: number, total: number): (number | "...")[] => {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const pages: (number | "...")[] = [1];
+
+  if (current > 3) pages.push("...");
+
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let i = start; i <= end; i++) pages.push(i);
+
+  if (current < total - 2) pages.push("...");
+
+  pages.push(total);
+  return pages;
+};
 
 const Pagination = React.forwardRef<HTMLDivElement, Props>(
   ({ className, page, totalPages, onValueChange, ...props }, ref) => {
@@ -32,18 +48,29 @@ const Pagination = React.forwardRef<HTMLDivElement, Props>(
         </button>
 
         {/* Page numbers */}
-        {pages.map((p) => (
-          <button
-            key={p}
-            className={cn(
-              "px-3 py-1 border rounded",
-              p === page && "bg-black text-white",
-            )}
-            onClick={() => onValueChange(p)}
-          >
-            {p}
-          </button>
-        ))}
+        {getPages(page, totalPages).map((p, i) =>
+          p === "..." ? (
+            <span
+              key={`dot-${i}`}
+              className="px-2 py-1.5 text-sm text-muted-foreground"
+            >
+              ...
+            </span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => onValueChange(p)}
+              className={cn(
+                "w-9 h-9 rounded-lg border text-sm font-medium transition-colors",
+                p === page
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "hover:bg-muted text-foreground",
+              )}
+            >
+              {p}
+            </button>
+          ),
+        )}
 
         {/* Next */}
         <button

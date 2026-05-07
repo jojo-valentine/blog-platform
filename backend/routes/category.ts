@@ -6,7 +6,6 @@ import CategoryController from "../controllers/CategoryController";
 const router = Router();
 router.get(
   "/image-category",
-  authMiddleware,
   CategoryController.listImageCategory,
 );
 export default router;
