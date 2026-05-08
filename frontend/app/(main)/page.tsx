@@ -1,9 +1,10 @@
 "use client";
-import Banner from "./components/ui/banner";
-import Featured from "./components/ui/featured";
-import { PostSkeleton } from "./components/skeleton/post-skeleton";
-import { BannerSkeleton } from "./components/skeleton/banner-skeleton";
-import { FeaturedSkeleton } from "./components/skeleton/featured-skeleton";
+import "../styles/globals.css";
+import Banner from "../components/ui/banner";
+import Featured from "../components/ui/featured";
+import { PostSkeleton } from "../components/skeleton/post-skeleton";
+import { BannerSkeleton } from "../components/skeleton/banner-skeleton";
+import { FeaturedSkeleton } from "../components/skeleton/featured-skeleton";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import axios from "axios";

@@ -71,11 +71,11 @@ export default function LoginPage() {
         showConfirmButton: false,
       }).then(() => {
         if (roles.includes("admin")) {
-          // router.push("/admin");
+          router.push("/admin");
         } else if (roles.includes("blogger")) {
-          // router.push("/blogger");
+          router.push("/pages/blog");
         } else {
-          // router.push("/");
+          router.push("/");
         }
       });
     } catch (error: any) {
