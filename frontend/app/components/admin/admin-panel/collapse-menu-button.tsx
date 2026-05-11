@@ -1,10 +1,9 @@
 "use client";
-
 import Link from "next/link";
 import { useState } from "react";
 import { ChevronDown, Dot, LucideIcon } from "lucide-react";
 
-import { cn } from "@/app/lib/utils";
+import { cn } from "@/app/lib/admin/utils";
 import { Button } from "@/app/components/admin/ui/button";
 import { DropdownMenuArrow } from "@radix-ui/react-dropdown-menu";
 import {

@@ -1,3 +1,4 @@
+"use client";
 import { ChevronLeft } from "lucide-react";
 
 import { cn } from "@/app/lib/utils";
@@ -20,7 +21,7 @@ export function SidebarToggle({ isOpen, setIsOpen }: SidebarToggleProps) {
         <ChevronLeft
           className={cn(
             "h-4 w-4 transition-transform ease-in-out duration-700",
-            isOpen === false ? "rotate-180" : "rotate-0"
+            isOpen === false ? "rotate-180" : "rotate-0",
           )}
         />
       </Button>

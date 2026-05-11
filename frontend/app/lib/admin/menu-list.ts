@@ -33,7 +33,7 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "",
       menus: [
         {
-          href: "/dashboard",
+          href: "/admin",
           label: "Dashboard",
           icon: LayoutGrid,
           submenus: []
@@ -52,14 +52,14 @@ export function getMenuList(pathname: string): Group[] {
               href: "/posts",
               label: "All Posts"
             },
-            {
-              href: "/posts/new",
-              label: "New Post"
-            }
+            // {
+            //   href: "/posts/new",
+            //   label: "New Post"
+            // }
           ]
         },
         {
-          href: "/categories",
+          href: "admin/pages/categories/",
           label: "Categories",
           icon: Bookmark
         },
