@@ -49,7 +49,7 @@ export function getMenuList(pathname: string): Group[] {
           icon: SquarePen,
           submenus: [
             {
-              href: "/posts",
+              href: "/admin/pages/posts",
               label: "All Posts"
             },
             // {
@@ -59,7 +59,7 @@ export function getMenuList(pathname: string): Group[] {
           ]
         },
         {
-          href: "admin/pages/categories/",
+          href: "/admin/pages/categories/",
           label: "Categories",
           icon: Bookmark
         },

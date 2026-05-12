@@ -5,6 +5,21 @@ import axios from "axios";
 import { useAuth } from "@/app/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { API_URL } from "@/app/lib/config";
+import { Skeleton } from "@/app/components/admin/ui/skeleton";
+export function SkeletonTable() {
+  return (
+    <div className="flex w-full max-w-sm flex-col gap-2">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div className="flex gap-4" key={index}>
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 import {
   SquarePen,
   Trash2,
@@ -40,6 +55,7 @@ import {
 } from "@/app/components/admin/ui/field";
 import { text } from "stream/consumers";
 import Swal, { SweetAlertResult } from "sweetalert2";
+import { PaginationTable } from "@/app/components/admin/ui/pagination_custom";
 type Category = {
   _id?: string;
   name: string;
@@ -92,8 +108,8 @@ export default function PageCategory() {
       });
       const data = res.data;
       // console.log(data.data);
-
       setCategories(data.data);
+      setTotalPages(data.meta.totalPages);
     } catch (error: any) {
       console.error(
         "Fetch data failed:",
@@ -102,18 +118,7 @@ export default function PageCategory() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 1500); // ⏱ 500ms
-
-    return () => clearTimeout(timer);
-  }, [search]);
-  useEffect(() => {
-    if (user) fetchCategories();
-  }, [user, fetchCategories, page, debouncedSearch]);
+  }, [page, debouncedSearch]);
 
   const onChangeCreate = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, name, value } = e.target;
@@ -269,6 +274,16 @@ export default function PageCategory() {
       }
     });
   };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 1500); // ⏱ 500ms
+
+    return () => clearTimeout(timer);
+  }, [search]);
+  useEffect(() => {
+    if (user) fetchCategories();
+  }, [user, fetchCategories, page, debouncedSearch]);
 
   return (
     <ContentLayout title="categories">
@@ -278,6 +293,32 @@ export default function PageCategory() {
           <p className="text-sm text-muted-foreground">
             Manage image categories
           </p>
+        </div>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="w-full sm:max-w-sm">
+            <input
+              type="text"
+              placeholder="Search category..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="
+                w-full
+                rounded-lg
+                border
+                border-border
+                bg-background
+                px-4
+                py-2
+                text-sm
+                text-foreground
+                placeholder:text-muted-foreground
+                outline-none
+                transition
+                focus:ring-2
+                focus:ring-ring
+              "
+            />
+          </div>
         </div>
 
         <Button
@@ -315,62 +356,92 @@ export default function PageCategory() {
               </th>
             </tr>
           </thead>
+
           <tbody>
-            {categories.map((cat, index) => (
-              <tr
-                key={cat._id || index}
-                className="bg-neutral-primary border-b border-default"
-              >
-                <th
-                  scope="row"
-                  className="px-6 py-4 font-medium text-heading whitespace-nowrap"
-                >
-                  {cat.name}
-                </th>
-
-                <td className="px-6 py-4">
-                  {" "}
-                  {cat.uploadedBy?.name || "ไม่ระบุ"}
-                </td>
-                <td className="px-6 py-4">{formatDate(cat.createdAt)}</td>
-
-                <td className="px-6 py-4">
-                  {formatDate(cat.updatedAt) || (
-                    <span className="text-muted-foreground">Not updated</span>
-                  )}
-                </td>
-
-                <td className="px-6 py-4">
-                  {formatDate(cat.deletedAt) || (
-                    <span className="text-muted-foreground">Active</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 flex gap-2">
-                  <Button
-                    type="button"
-                    className="h-8 w-8 p-0 flex items-center justify-center rounded-md border cursor-pointer"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      handleEdit(cat._id!);
-                    }}
-                  >
-                    <SquarePen className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    className="h-8 w-8 p-0 flex items-center justify-center rounded-md border cursor-pointer"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      handleDelete(cat._id!);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-6">
+                  <div className="flex w-full flex-col gap-3">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <div className="flex gap-4" key={index}>
+                        <Skeleton className="h-4 flex-1" />
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                    ))}
+                  </div>
                 </td>
               </tr>
-            ))}
+            ) : categories.length > 0 ? (
+              categories.map((cat, index) => (
+                <tr
+                  key={cat._id || index}
+                  className=" border-b border-border bg-background hover:bg-muted/50 transition-colors "
+                >
+                  <th
+                    scope="row"
+                    className=" whitespace-nowrap px-6 py-4 font-medium text-foreground "
+                  >
+                    {cat.name}
+                  </th>
+
+                  <td className="px-6 py-4">
+                    {cat.uploadedBy?.name || "ไม่ระบุ"}
+                  </td>
+
+                  <td className="px-6 py-4">{formatDate(cat.createdAt)}</td>
+
+                  <td className="px-6 py-4">
+                    {formatDate(cat.updatedAt) || (
+                      <span className="text-muted-foreground">Not updated</span>
+                    )}
+                  </td>
+
+                  <td className="px-6 py-4">
+                    {formatDate(cat.deletedAt) || (
+                      <span className="text-muted-foreground">Active</span>
+                    )}
+                  </td>
+
+                  <td className="px-6 py-4">
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="cursor-pointer"
+                        onClick={() => {
+                          handleEdit(cat._id!);
+                        }}
+                      >
+                        <SquarePen className="h-4 w-4" />
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="cursor-pointer"
+                        onClick={() => {
+                          handleDelete(cat._id!);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-6 py-10 text-center text-muted-foreground "
+                >
+                  No categories found
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -484,6 +555,11 @@ export default function PageCategory() {
           </DialogContent>
         </Dialog>
       )}
+      <PaginationTable
+        page={page}
+        totalPages={totalPages}
+        onValueChange={(p) => setPage(p)}
+      />
     </ContentLayout>
   );
 }

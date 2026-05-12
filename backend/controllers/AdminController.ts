@@ -30,19 +30,32 @@ class AdminController {
 
         filter.$or = orConditions;
       }
-      if (tags) {
-        filter.tags = { $in: [tags] };
+      const categoryRaw = req.query.category || req.query["category[]"];
+
+      const category = Array.isArray(categoryRaw)
+        ? categoryRaw
+        : typeof categoryRaw === "string"
+          ? categoryRaw.split(",")
+          : [];
+
+      if (category.length > 0) {
+        filter.tags_id = { $all: category };
       }
       // ✅ query
       const [blogs, total] = await Promise.all([
         Blog.find(filter)
           .select(
-            "title content cover_image tags suspended is_online createdAt deletedAt",
+            "title content cover_image tag_id  suspended is_online createdAt deletedAt",
           )
           .populate({
             path: "images",
             // match: { deletedAt: null },
             select: "path image",
+          })
+          .populate({
+            path: "tags_id",
+            // match: { deletedAt: null },
+            select: "name",
           })
           .sort({ createdAt: -1 })
           .skip(skip)
@@ -72,30 +85,37 @@ class AdminController {
   static async toggleBlogPostSuspension(req: Request, res: Response) {
     const session = await mongoose.startSession();
 
-    const { action } = req.body;
+    const { suspended } = req.body;
+
     try {
       await session.withTransaction(async () => {
         const blogId = req.params.id;
+
         if (!blogId) {
           throw new Error("blogId not provided");
         }
 
         const blog = await Blog.findById(blogId).session(session);
+
         if (!blog) {
-          throw new Error("blog not Found");
-        }
-        if (action === "suspend") {
-          blog.suspended = true;
-        } else if (action === "unsuspend") {
-          blog.suspended = false;
-        } else {
-          throw new Error("Invalid action");
+          throw new Error("blog not found");
         }
 
-        await blog.save({ session });
+        if (typeof suspended !== "boolean") {
+          throw new Error("Invalid suspended value");
+        }
+
+        blog.suspended = suspended;
+
+        await blog.save({
+          session,
+        });
       });
+
       return res.status(200).json({
-        message: `Successfully updated blog ${action === "suspend" ? "suspend" : "unsuspend"}`,
+        message: suspended
+          ? "Successfully suspended blog"
+          : "Successfully unsuspended blog",
       });
     } catch (err: unknown) {
       return res.status(500).json({
@@ -118,13 +138,7 @@ class AdminController {
       if (q) {
         const orConditions: any[] = [
           {
-            title: {
-              $regex: q,
-              $options: "i",
-            },
-          },
-          {
-            content: {
+            name: {
               $regex: q,
               $options: "i",
             },
