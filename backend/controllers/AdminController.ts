@@ -13,7 +13,7 @@ class AdminController {
       // ✅ search
       const q = (req.query.search as string)?.trim();
       const tags = (req.query.tags as string)?.split(",");
-      const filter: any = { deletedAt: null };
+      const filter: any = {};
 
       // 🔥 ถ้ามี keyword
       if (q) {
@@ -49,7 +49,7 @@ class AdminController {
           )
           .populate({
             path: "images",
-            // match: { deletedAt: null },
+            match: { deletedAt: null },
             select: "path image",
           })
           .populate({

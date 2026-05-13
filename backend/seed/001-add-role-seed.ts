@@ -8,7 +8,7 @@ const seedRoles = [
     permissions: ["create_user", "update_user", "blog_suspension", "blog_view"],
   },
   {
-    name: "bloger",
+    name: "blogger",
     permissions: ["create_user"],
   },
 ];

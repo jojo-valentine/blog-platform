@@ -452,15 +452,25 @@ class BlogController {
   }
   static async blogDeletePost(req: Request, res: Response) {
     const blogId = req.params.id;
-    const userId = req.user?.userId;
+    // const userId = req.user?.userId;
+    const user = req.user;
+
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
-        const blog = await Blog.findOne({
+        if (!user) {
+          throw new Error("Unauthorized");
+        }
+
+        const filter: any = {
           _id: blogId,
-          user_id: userId, // ✅ เช็คว่าเป็นของ user นี้
-          deletedAt: null, // ✅ ยังไม่ถูกลบ
-        }).session(session);
+          deletedAt: null,
+        };
+        // ✅ user ธรรมดาลบได้เฉพาะโพสต์ตัวเอง
+        if (!user.roles.includes("admin")) {
+          filter.user_id = user.userId;
+        }
+        const blog = await Blog.findOne(filter).session(session);
         if (!blog) throw new Error("Blog not found");
 
         await Blog.findByIdAndUpdate(

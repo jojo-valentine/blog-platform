@@ -35,6 +35,7 @@ interface Blog {
   is_online: boolean;
   suspended: boolean;
   createdAt: string;
+  deletedAt: string;
 }
 type category = {
   _id: string;
@@ -60,6 +61,7 @@ export default function pagePosts() {
   const [loadingToggleSuspend, setLoadingToggleSuspend] = useState<
     string | null
   >(null);
+  const [loadingDeleteId, setLoadingDeleteId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -169,7 +171,42 @@ export default function pagePosts() {
       setLoadingToggleSuspend(null);
     }
   };
+  const deleteBlog = async (id: string) => {
+    setLoadingDeleteId(id);
 
+    try {
+      await axios.delete(`${API_URL}/api/blog/${id}/delete`, {
+        withCredentials: true,
+      });
+
+      // ✅ update status ใน state
+      setBlogs((prev) =>
+        prev.map((blog) =>
+          blog._id === id
+            ? {
+                ...blog,
+                deletedAt: new Date().toISOString(),
+              }
+            : blog,
+        ),
+      );
+
+      Swal.fire({
+        title: "Deleted 🎉",
+        icon: "success",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      Swal.fire({
+        title: "Error",
+        icon: "error",
+        text: error.response?.data?.message || error.message || "Delete failed",
+      });
+    } finally {
+      setLoadingDeleteId(null);
+    }
+  };
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -195,17 +232,17 @@ export default function pagePosts() {
 
             <p className="text-sm text-muted-foreground">Manage blog posts</p>
           </div>
-          {/* 
+
           <Button
             variant="outline"
             type="button"
             className="flex items-center gap-2 cursor-pointer bg-green-500 text-white hover:bg-green-600 px-3 py-2 rounded-md"
-            onClick={() => router.push("/admin/posts/create")}
+            onClick={() => router.push("/admin/pages/posts/create/")}
           >
             <Plus className="w-4 h-4" />
 
             <span>Add Post</span>
-          </Button> */}
+          </Button>
         </div>
 
         {/* Filters */}
@@ -373,7 +410,7 @@ export default function pagePosts() {
                   <td className="px-4 py-4">
                     <div className="flex -space-x-2">
                       {blog.gallery.length > 0 ? (
-                        blog.gallery?.slice(0, 3).map((img) => (
+                        blog.gallery?.slice(0, 5).map((img) => (
                           <img
                             key={img._id}
                             src={
@@ -406,13 +443,30 @@ export default function pagePosts() {
                   {/* Status */}
                   <td className="px-4 py-4">
                     <span
-                      className={`rounded-full px-2 py-1 text-xs font-medium${blog.suspended ? "bg-red-500/10 text-red-600" : blog.is_online ? "bg-green-500/10 text-green-600" : "bg-yellow-500/10 text-yellow-600"}`}
+                      className={`
+                        rounded-full
+                        px-2
+                        py-1
+                        text-xs
+                        font-medium
+                        ${
+                          blog.deletedAt
+                            ? "bg-gray-500/10 text-gray-600"
+                            : blog.suspended
+                              ? "bg-red-500/10 text-red-600"
+                              : blog.is_online
+                                ? "bg-green-500/10 text-green-600"
+                                : "bg-yellow-500/10 text-yellow-600"
+                        }
+                      `}
                     >
-                      {blog.suspended
-                        ? "Suspended"
-                        : blog.is_online
-                          ? "Published"
-                          : "Draft"}
+                      {blog.deletedAt
+                        ? "Deleted"
+                        : blog.suspended
+                          ? "Suspended"
+                          : blog.is_online
+                            ? "Published"
+                            : "Draft"}
                     </span>
                   </td>
 
@@ -424,9 +478,16 @@ export default function pagePosts() {
                   {/* Actions */}
                   <td className="px-4 py-4">
                     <div className="flex gap-2">
-                      {/* <Button size="icon" variant="outline">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() =>
+                          router.push(`/admin/pages/posts/${blog._id}`)
+                        }
+                      >
                         <SquarePen className="w-4 h-4" />
-                      </Button> */}
+                      </Button>
+
                       {/* Suspend Toggle */}
                       <Button
                         type="button"
@@ -444,9 +505,30 @@ export default function pagePosts() {
                           <Ban className="w-4 h-4" />
                         )}
                       </Button>
-                      {/* <Button size="icon" variant="outline">
-                        <Trash2 className="w-4 h-4" />
-                      </Button> */}
+                      {blog.deletedAt == null && (
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          type="button"
+                          disabled={loadingDeleteId === blog._id}
+                          className={`
+                            cursor-pointer transition-colors
+                            ${loadingDeleteId === blog._id ? "opacity-50 cursor-not-allowed" : ""}
+                            ${
+                              blog.suspended
+                                ? "hover:bg-green-500/10 hover:text-green-600"
+                                : "hover:bg-red-500/10 hover:text-red-600"
+                            }
+                          `}
+                          onClick={() => deleteBlog(blog._id)}
+                        >
+                          {loadingDeleteId === blog._id ? (
+                            <Loader2 className="w-4 h-4 animate-spin " />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -454,7 +536,7 @@ export default function pagePosts() {
             ) : (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-6 py-10 text-center text-muted-foreground "
                 >
                   No blog post found

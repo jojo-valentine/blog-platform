@@ -7,11 +7,13 @@ import { checkMaxBlogImages, uploadBlog } from "../middleware/uploadMiddleware";
 import { generateBlogId } from "../services/generateId ";
 const router = Router();
 import multer from "multer";
+import { requireRole } from "../middleware/roleMiddleware";
 const upload = multer();
 router.get("/data-list", authMiddleware, BlogController.blogDataList);
 router.post(
   "/create",
   authMiddleware,
+  requireRole("admin", "blogger"),
   generateBlogId,
   uploadBlog,
   useValidation({ body: blogSchemas.create }),
@@ -23,11 +25,22 @@ router.post(
 //   res.json({ body: req.body, files: req.files });
 // });
 
-router.get("/:id/edit", authMiddleware, BlogController.blogEdit);
-router.delete("/:id/image", authMiddleware, BlogController.blogDeleteImage);
+router.get(
+  "/:id/edit",
+  authMiddleware,
+  requireRole("admin", "blogger"),
+  BlogController.blogEdit,
+);
+router.delete(
+  "/:id/image",
+  authMiddleware,
+  requireRole("admin", "blogger"),
+  BlogController.blogDeleteImage,
+);
 router.patch(
   "/:id/update",
   authMiddleware,
+  requireRole("admin", "blogger"),
   uploadBlog,
   checkMaxBlogImages,
   useValidation({ body: blogSchemas.update }),
@@ -36,10 +49,16 @@ router.patch(
 router.patch(
   "/:id/toggle",
   authMiddleware,
+  requireRole("admin", "blogger"),
   useValidation({ body: blogSchemas.toggleBlog }),
   BlogController.blogTogglePost,
 );
-router.delete("/:id/delete", authMiddleware, BlogController.blogDeletePost);
+router.delete(
+  "/:id/delete",
+  authMiddleware,
+  requireRole("admin", "blogger"),
+  BlogController.blogDeletePost,
+);
 
 router.get("/home", BlogController.blogHome);
 router.get("/public", BlogController.blogPublicList);
