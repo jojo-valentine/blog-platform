@@ -500,61 +500,7 @@ export default function PageCategory() {
           </DialogContent>
         </Dialog>
       )}
-      {dialogCreate && (
-        <Dialog open={dialogCreate} onOpenChange={setDialogCreate}>
-          <DialogContent className="sm:max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Create Category</DialogTitle>
-
-              <DialogDescription>
-                Create a new category for organizing images.
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmitFromCreate} className="space-y-4">
-              <FieldGroup>
-                <Field>
-                  <Label htmlFor="name">Category Name</Label>
-
-                  <Input
-                    id="name"
-                    name="name"
-                    placeholder="Enter category name"
-                    required
-                    value={formCreate.name}
-                    onChange={onChangeCreate}
-                    className={formEditError.name ? "border-red-500" : ""}
-                  />
-                </Field>
-                {formEditError.name && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {formEditError.name}
-                  </p>
-                )}
-              </FieldGroup>
-
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline" type="button">
-                    Cancel
-                  </Button>
-                </DialogClose>
-
-                <Button type="submit" disabled={loadingCreate}>
-                  {loadingCreate ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Create"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      )}
+  
       <PaginationTable
         page={page}
         totalPages={totalPages}

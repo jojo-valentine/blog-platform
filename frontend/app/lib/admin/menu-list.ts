@@ -5,7 +5,7 @@ import {
   Bookmark,
   SquarePen,
   LayoutGrid,
-  LucideIcon
+  LucideIcon,
 } from "lucide-react";
 
 type Submenu = {
@@ -36,9 +36,9 @@ export function getMenuList(pathname: string): Group[] {
           href: "/admin",
           label: "Dashboard",
           icon: LayoutGrid,
-          submenus: []
-        }
-      ]
+          submenus: [],
+        },
+      ],
     },
     {
       groupLabel: "Contents",
@@ -50,40 +50,60 @@ export function getMenuList(pathname: string): Group[] {
           submenus: [
             {
               href: "/admin/pages/posts",
-              label: "All Posts"
+              label: "All Posts",
             },
             // {
             //   href: "/posts/new",
             //   label: "New Post"
             // }
-          ]
+          ],
         },
         {
           href: "/admin/pages/categories/",
           label: "Categories",
           icon: Bookmark
         },
-        {
-          href: "/tags",
-          label: "Tags",
-          icon: Tag
-        }
-      ]
+        // {
+        //   href: "/tags",
+        //   label: "Tags",
+        //   icon: Tag
+        // }
+      ],
     },
     {
-      groupLabel: "Settings",
+      groupLabel: "role permission",
       menus: [
         {
-          href: "/users",
-          label: "Users",
-          icon: Users
+          href: "",
+          label: "role",
+          icon: SquarePen,
+          submenus: [
+            {
+              href: "/admin/pages/roles/",
+              label: "All role",
+            },
+            // {
+            //   href: "/admin/pages/permission/",
+            //   label: "permission",
+            // },
+          ],
         },
-        {
-          href: "/account",
-          label: "Account",
-          icon: Settings
-        }
-      ]
-    }
+      ],
+    },
+    // {
+    //   groupLabel: "Settings",
+    //   menus: [
+    //     {
+    //       href: "/users",
+    //       label: "Users",
+    //       icon: Users
+    //     },
+    //     {
+    //       href: "/account",
+    //       label: "Account",
+    //       icon: Settings
+    //     }
+    //   ]
+    // }
   ];
 }

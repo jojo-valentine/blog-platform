@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { Blog, ImageBlog, ImageCategory } from "../models";
-import mongoose, { mongo } from "mongoose";
+import { Blog, ImageBlog, ImageCategory, Role } from "../models";
+import mongoose, { mongo, startSession } from "mongoose";
 
 class AdminController {
   static async listBlog(req: Request, res: Response) {
@@ -313,5 +313,131 @@ class AdminController {
       session.endSession();
     }
   }
+  static async listRoles(req: Request, res: Response) {
+    try {
+      const page = Math.max(Number(req.query.page) || 1, 1);
+      const limit = Math.min(Number(req.query.limit) || 10, 50);
+      const skip = (page - 1) * limit;
+
+      const q = (req.query.search as string)?.trim();
+
+      const filter: any = {};
+
+      if (q) {
+        const orConditions: any[] = [
+          {
+            name: {
+              $regex: q,
+              $options: "i",
+            },
+          },
+        ];
+
+        if (mongoose.Types.ObjectId.isValid(q)) {
+          orConditions.push({
+            _id: new mongoose.Types.ObjectId(q),
+          });
+        }
+
+        filter.$or = orConditions;
+      }
+
+      const [roles, total] = await Promise.all([
+        Role.find(filter)
+          .select("_id name permissions deletedAt")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+
+        Role.countDocuments(filter),
+      ]);
+
+      return res.status(200).json({
+        message: "success",
+        data: roles,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
+  static async createRole(req: Request, res: Response) {}
+  static async updateRole(req: Request, res: Response) {
+    const id = req.params.id;
+
+    const session = await startSession();
+
+    try {
+      const { name, permissions } = req.body;
+
+      const parsePermissions = (permissions: unknown): string[] => {
+        if (Array.isArray(permissions)) {
+          return permissions.filter((p): p is string => typeof p === "string");
+        }
+
+        if (typeof permissions === "string") {
+          try {
+            const parsed = JSON.parse(permissions);
+
+            if (Array.isArray(parsed)) {
+              return parsed.filter((p): p is string => typeof p === "string");
+            }
+          } catch {}
+
+          return permissions
+            .replace(/'/g, "")
+            .split(",")
+            .map((p) => p.trim())
+            .filter(Boolean);
+        }
+
+        return [];
+      };
+
+      // validate
+      if (!name || typeof name !== "string") {
+        return res.status(400).json({
+          message: "Name is required",
+        });
+      }
+
+      const parsedPermissions = parsePermissions(permissions);
+      let updatedRole;
+      await session.withTransaction(async () => {
+        const role = await Role.findById(id).session(session);
+
+        if (!role) {
+          throw new Error("Role not found");
+        }
+
+        role.name = name.trim();
+
+        role.permissions = parsedPermissions;
+        updatedRole = await role.save({ session });
+      });
+
+      return res.status(200).json({
+        message: "Role updated successfully",
+        data: updatedRole,
+      });
+    } catch (error: unknown) {
+      return res.status(500).json({
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+  static async deleteRole(req: Request, res: Response) {}
 }
 export default AdminController;

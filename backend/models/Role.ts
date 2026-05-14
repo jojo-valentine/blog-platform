@@ -5,6 +5,7 @@ const RoleSchema = new Schema<IRole>(
   {
     name: { type: String, required: true, unique: true },
     permissions: [{ type: String }],
+    deletedAt: { type: Date, default: undefined },
   },
   { timestamps: true },
 );

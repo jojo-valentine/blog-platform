@@ -24,7 +24,7 @@ import { Label } from "@/app/components/admin/ui/label";
 import { CategoryCheckBox } from "@/app/components/ui/categoryCheckBox";
 import Swal, { SweetAlertResult } from "sweetalert2";
 import { PaginationTable } from "@/app/components/admin/ui/pagination_custom";
-import { Skeleton } from "@/app/components/admin/ui/skeleton";
+import { Skeleton, TableSkeleton } from "@/app/components/admin/ui/skeleton";
 interface Blog {
   _id: string;
   title: string;
@@ -171,42 +171,61 @@ export default function pagePosts() {
       setLoadingToggleSuspend(null);
     }
   };
-  const deleteBlog = async (id: string) => {
-    setLoadingDeleteId(id);
+const deleteBlog = async (id: string) => {
+  const result = await Swal.fire({
+    title: "Delete blog?",
+    text: "You won't be able to revert this!",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#6b7280",
+    confirmButtonText: "Yes, delete it",
+    cancelButtonText: "Cancel",
+    reverseButtons: true,
+  });
 
-    try {
-      await axios.delete(`${API_URL}/api/blog/${id}/delete`, {
-        withCredentials: true,
-      });
+  // ❌ กดยกเลิก
+  if (!result.isConfirmed) return;
 
-      // ✅ update status ใน state
-      setBlogs((prev) =>
-        prev.map((blog) =>
-          blog._id === id
-            ? {
-                ...blog,
-                deletedAt: new Date().toISOString(),
-              }
-            : blog,
-        ),
-      );
+  setLoadingDeleteId(id);
 
-      Swal.fire({
-        title: "Deleted 🎉",
-        icon: "success",
-        timer: 1200,
-        showConfirmButton: false,
-      });
-    } catch (error: any) {
-      Swal.fire({
-        title: "Error",
-        icon: "error",
-        text: error.response?.data?.message || error.message || "Delete failed",
-      });
-    } finally {
-      setLoadingDeleteId(null);
-    }
-  };
+  try {
+    await axios.delete(`${API_URL}/api/blog/${id}/delete`, {
+      withCredentials: true,
+    });
+
+    // ✅ update state
+    setBlogs((prev) =>
+      prev.map((blog) =>
+        blog._id === id
+          ? {
+              ...blog,
+              deletedAt: new Date().toISOString(),
+            }
+          : blog,
+      ),
+    );
+
+    Swal.fire({
+      title: "Deleted 🎉",
+      text: "Blog has been deleted.",
+      icon: "success",
+      timer: 1200,
+      showConfirmButton: false,
+    });
+  } catch (error: any) {
+    Swal.fire({
+      title: "Error",
+      icon: "error",
+      text:
+        error.response?.data?.message ||
+        error.message ||
+        "Delete failed",
+    });
+  } finally {
+    setLoadingDeleteId(null);
+  }
+};
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -294,54 +313,7 @@ export default function pagePosts() {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-4">
-                  <div className="space-y-4">
-                    {Array.from({ length: 5 }).map((_, index) => (
-                      <div
-                        key={index}
-                        className="
-              flex
-              items-center
-              gap-4
-              rounded-lg
-              border
-              border-border
-              p-4
-            "
-                      >
-                        {/* Cover */}
-                        <Skeleton className="h-16 w-16 rounded-md" />
-
-                        {/* Title */}
-                        <div className="flex flex-1 flex-col gap-2">
-                          <Skeleton className="h-4 w-52" />
-                          <Skeleton className="h-3 w-32" />
-                        </div>
-
-                        {/* Tags */}
-                        <div className="hidden md:flex gap-2">
-                          <Skeleton className="h-6 w-16 rounded-full" />
-                          <Skeleton className="h-6 w-20 rounded-full" />
-                        </div>
-
-                        {/* Status */}
-                        <Skeleton className="h-6 w-20 rounded-full" />
-
-                        {/* Date */}
-                        <Skeleton className="h-4 w-28" />
-
-                        {/* Actions */}
-                        <div className="flex gap-2">
-                          <Skeleton className="h-9 w-9 rounded-md" />
-                          <Skeleton className="h-9 w-9 rounded-md" />
-                          <Skeleton className="h-9 w-9 rounded-md" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </td>
-              </tr>
+              <TableSkeleton length={7} colSpan={7} />
             ) : blogs.length > 0 ? (
               blogs.map((blog, i) => (
                 <tr

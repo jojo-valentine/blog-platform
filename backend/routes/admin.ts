@@ -63,4 +63,16 @@ router.delete(
   AdminController.destroyCategory,
 ); // hard delete
 
+// ดึงรายการ role ทั้งหมด
+router.get("/roles", authMiddleware, requireRole("admin"), AdminController.listRoles);
+
+// สร้าง role ใหม่
+router.post("/roles", authMiddleware, requireRole("admin"), AdminController.createRole);
+
+// อัปเดต role ตาม id
+router.patch("/roles/:id/update", authMiddleware, requireRole("admin"), AdminController.updateRole);
+
+// ลบ role ตาม id
+router.delete("/roles/:id/delete", authMiddleware, requireRole("admin"), AdminController.deleteRole);
+
 export default router;
