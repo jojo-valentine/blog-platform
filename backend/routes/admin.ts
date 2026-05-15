@@ -4,6 +4,8 @@ import { requirePermission, requireRole } from "../middleware/roleMiddleware";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { useValidation } from "../middleware/useValidation";
 import { categorySchemas } from "../validations/categoryValidation";
+import { adminSchemas } from "../validations/adminValidation";
+
 const router = Router();
 
 router.get("test", (req: Request, res: Response) => {
@@ -64,15 +66,36 @@ router.delete(
 ); // hard delete
 
 // ดึงรายการ role ทั้งหมด
-router.get("/roles", authMiddleware, requireRole("admin"), AdminController.listRoles);
+router.get(
+  "/roles",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.listRoles,
+);
 
 // สร้าง role ใหม่
-router.post("/roles", authMiddleware, requireRole("admin"), AdminController.createRole);
+router.post(
+  "/roles",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.createRole,
+);
 
 // อัปเดต role ตาม id
-router.patch("/roles/:id/update", authMiddleware, requireRole("admin"), AdminController.updateRole);
+router.patch(
+  "/roles/:id/update",
+  authMiddleware,
+  requireRole("admin"),
+  useValidation({ body: adminSchemas.update }),
+  AdminController.updateRole,
+);
 
 // ลบ role ตาม id
-router.delete("/roles/:id/delete", authMiddleware, requireRole("admin"), AdminController.deleteRole);
+router.patch(
+  "/roles/:id/delete",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.deleteRole,
+);
 
 export default router;

@@ -191,6 +191,17 @@ class AdminController {
       const { name } = req.body;
       let data: any = null;
       await session.withTransaction(async () => {
+        const existingCategory = await ImageCategory.findOne({
+          name: name.trim(),
+        }).session(session);
+
+        if (existingCategory) {
+          // ✅ return แทน throw
+          return res.status(400).json({
+            message: "Validation error",
+            errors: [{ field: "name", message: "Category already exists" }],
+          });
+        }
         const category = new ImageCategory({ name });
         await category.save({ session });
         data = category;
@@ -219,6 +230,19 @@ class AdminController {
       let data: any = null;
 
       await session.withTransaction(async () => {
+        const existingCategory = await ImageCategory.findOne({
+          name: name.trim(),
+          _id: id,
+        }).session(session);
+
+        if (existingCategory) {
+          // ✅ return แทน throw
+          return res.status(400).json({
+            message: "Validation error",
+            errors: [{ field: "name", message: "Category already exists" }],
+          });
+        }
+
         const category = await ImageCategory.findOneAndUpdate(
           { _id: id }, // filter
           { name: name, uploadedBy: req.user?.userId, updatedAt: new Date() }, // update fields
@@ -370,10 +394,45 @@ class AdminController {
       });
     }
   }
-  static async createRole(req: Request, res: Response) {}
+  static async createRole(req: Request, res: Response) {
+    const session = await startSession();
+    try {
+      const { name, permissions } = req.body;
+      let createdRole;
+
+      await session.withTransaction(async () => {
+        const existingRole = await Role.findOne({ name: name.trim() }).session(
+          session,
+        );
+
+        if (existingRole) {
+          // ✅ return แทน throw
+          return res.status(400).json({
+            message: "Validation error",
+            errors: [{ field: "name", message: "Role already exists" }],
+          });
+        }
+
+        const role = new Role({ name: name.trim(), permissions });
+        createdRole = await role.save({ session });
+      });
+
+      return res.status(201).json({
+        message: "Role created successfully",
+        data: createdRole,
+      });
+    } catch (error: unknown) {
+      return res.status(500).json({
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+
   static async updateRole(req: Request, res: Response) {
     const id = req.params.id;
-
     const session = await startSession();
 
     try {
@@ -383,44 +442,54 @@ class AdminController {
         if (Array.isArray(permissions)) {
           return permissions.filter((p): p is string => typeof p === "string");
         }
-
         if (typeof permissions === "string") {
           try {
             const parsed = JSON.parse(permissions);
-
-            if (Array.isArray(parsed)) {
+            if (Array.isArray(parsed))
               return parsed.filter((p): p is string => typeof p === "string");
-            }
           } catch {}
-
           return permissions
             .replace(/'/g, "")
             .split(",")
             .map((p) => p.trim())
             .filter(Boolean);
         }
-
         return [];
       };
 
-      // validate
+      // ✅ validate name
       if (!name || typeof name !== "string") {
         return res.status(400).json({
-          message: "Name is required",
+          message: "Validation error",
+          errors: [{ field: "name", message: "Name is required" }],
         });
       }
 
       const parsedPermissions = parsePermissions(permissions);
       let updatedRole;
+
       await session.withTransaction(async () => {
         const role = await Role.findById(id).session(session);
 
+        // ✅ ไม่พบ role
         if (!role) {
-          throw new Error("Role not found");
+          return res.status(404).json({ message: "Role not found" });
+        }
+
+        // ✅ ชื่อซ้ำ
+        const existingRole = await Role.findOne({
+          name: name.trim(),
+          _id: { $ne: id },
+        }).session(session);
+
+        if (existingRole) {
+          return res.status(400).json({
+            message: "Validation error",
+            errors: [{ field: "name", message: "Role name already exists" }],
+          });
         }
 
         role.name = name.trim();
-
         role.permissions = parsedPermissions;
         updatedRole = await role.save({ session });
       });
@@ -438,6 +507,49 @@ class AdminController {
       await session.endSession();
     }
   }
-  static async deleteRole(req: Request, res: Response) {}
+
+  static async deleteRole(req: Request, res: Response) {
+    const id = req.params.id;
+
+    const session = await startSession();
+
+    try {
+      let updatedRole: any;
+
+      await session.withTransaction(async () => {
+        const role = await Role.findById(id).session(session);
+
+        if (!role) {
+          throw {
+            field: "other",
+            message: "Role not found",
+          };
+        }
+
+        // ✅ toggle delete / restore
+        role.deletedAt = role.deletedAt ? null : new Date();
+
+        updatedRole = await role.save({
+          session,
+        });
+      });
+
+      return res.status(200).json({
+        message: updatedRole?.deletedAt
+          ? "Role deleted successfully"
+          : "Role restored successfully",
+
+        data: updatedRole,
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        field: error.field || "other",
+
+        message: error.message || "Internal server error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
 }
 export default AdminController;

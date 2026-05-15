@@ -44,4 +44,4 @@ export const permissionsList = [
 
   // Analytics
   "view_analytics",
-];
+] as const;

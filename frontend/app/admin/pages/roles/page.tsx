@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { Plus, SquarePen, Loader2, Globe, Ban } from "lucide-react";
+import { Plus, SquarePen, Loader2, Trash2, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { API_URL } from "@/app/lib/config";
 import { useAuth } from "@/app/context/AuthContext";
@@ -47,6 +47,7 @@ type RoleForm = {
 type RoleFormError = {
   name: string;
   permissions: string[];
+  other?: string;
 };
 const initialForm: RoleForm = {
   name: "",
@@ -55,6 +56,7 @@ const initialForm: RoleForm = {
 const initialFormError: RoleFormError = {
   name: "",
   permissions: [],
+  other: "",
 };
 export default function PageRole() {
   const router = useRouter();
@@ -66,13 +68,19 @@ export default function PageRole() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dialogEdit, setDialogEdit] = useState(false);
+  const [dialogCreate, setDialogCreate] = useState(false);
   const [formEdit, setFormEdit] = useState<RoleForm>(initialForm);
+  const [formCreate, setFormCreate] = useState<RoleForm>(initialForm);
   const [loadingUpdate, setLoadingUpdate] = useState(false);
+  const [loadingCreate, setLoadingCreate] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-
+  const [formErrorCreate, setFormErrorCreate] =
+    useState<RoleFormError>(initialFormError);
   const [formErrorEdit, setFormErrorEdit] =
     useState<RoleFormError>(initialFormError);
   // debounce search
+  const [loadingDelete, setLoadingDelete] = useState<string | null>(null);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -131,7 +139,7 @@ export default function PageRole() {
       [name]: "",
     }));
   };
-  const handlePermissionChange = (permission: string) => {
+  const handlePermissionChangEdit = (permission: string) => {
     setFormEdit((prev) => {
       const exists = prev.permissions.includes(permission);
 
@@ -142,6 +150,26 @@ export default function PageRole() {
           : [...prev.permissions, permission],
       };
     });
+    setFormErrorEdit((prev) => ({
+      ...prev,
+      permissions: [], // ✅ เคลียร์ array ของ error messages
+    }));
+  };
+  const handlePermissionChangCreate = (permission: string) => {
+    setFormCreate((prev) => {
+      const exists = prev.permissions.includes(permission);
+
+      return {
+        ...prev,
+        permissions: exists
+          ? prev.permissions.filter((p) => p !== permission)
+          : [...prev.permissions, permission],
+      };
+    });
+    setFormErrorCreate((prev) => ({
+      ...prev,
+      permissions: [], // ✅ เคลียร์ array ของ error messages
+    }));
   };
   const handleSubmitFromUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,7 +198,11 @@ export default function PageRole() {
         const fieldErrors = structuredClone(initialFormError);
         err.errors.forEach(
           (e: { field: keyof RoleFormError; message: string }) => {
-            (fieldErrors as any)[e.field] = e.message;
+            if (e.field.includes("permissions")) {
+              fieldErrors.permissions.push(e.message);
+            } else {
+              (fieldErrors as any)[e.field] = e.message;
+            }
           },
         );
         setFormErrorEdit(fieldErrors);
@@ -184,6 +216,128 @@ export default function PageRole() {
       }
     } finally {
       setLoadingUpdate(false);
+    }
+  };
+  const onChangeCreate = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+
+    setFormCreate((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    setFormErrorCreate((prev) => ({
+      ...prev,
+      [name]: "",
+    }));
+  };
+  const handleCreatePage = () => {
+    setDialogCreate(true);
+    setFormEdit(initialForm);
+  };
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoadingCreate(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/admin/roles/`, formCreate, {
+        withCredentials: true,
+      });
+      Swal.fire({
+        title: "successfully",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+        text: "create success",
+      });
+      setFormCreate(initialForm);
+      setDialogCreate(false);
+      setRoles((prev) => [res.data.data, ...prev]);
+    } catch (error: any) {
+      const err = error.response?.data;
+      if (Array.isArray(err?.errors)) {
+        const fieldErrors = structuredClone(initialFormError);
+        err.errors.forEach(
+          (e: { field: keyof RoleFormError; message: string }) => {
+            if (
+              typeof e.field === "string" &&
+              e.field.includes("permissions")
+            ) {
+              // ถ้า permissions เป็น array
+              (fieldErrors.permissions as string[]).push(e.message);
+            } else if (e.field in fieldErrors) {
+              // assign ตรง key ที่มีอยู่
+              (fieldErrors as any)[e.field] = e.message;
+            } else {
+              // fallback
+              (fieldErrors as any).other = e.message;
+            }
+          },
+        );
+        setFormErrorCreate(fieldErrors);
+        Swal.fire({
+          title: "Validation Error",
+          icon: "error",
+          timer: 1500,
+          showConfirmButton: false,
+          text: "Please check your inputs",
+        });
+      }
+    } finally {
+      setLoadingCreate(false);
+    }
+  };
+  const handleDelete = async (id: string, deletedAt?: string | null) => {
+    try {
+      setLoadingDelete(id);
+
+      const result = await Swal.fire({
+        title: deletedAt ? "Restore role?" : "Delete role?",
+        text: deletedAt
+          ? "This role will be restored."
+          : "This role will be deleted.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: deletedAt ? "Restore" : "Delete",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: deletedAt ? "#16a34a" : "#dc2626",
+      });
+
+      if (!result.isConfirmed) return;
+      const res = await axios.patch(
+        `${API_URL}/api/admin/roles/${id}/delete`,
+        {},
+        {
+          withCredentials: true,
+        },
+      );
+      // ✅ update state
+      setRoles((prev) =>
+        prev.map((role) =>
+          role._id === id
+            ? {
+                ...role,
+                deletedAt: role.deletedAt ? null : new Date().toISOString(),
+              }
+            : role,
+        ),
+      );
+
+      Swal.fire({
+        title: deletedAt ? "Restored 🎉" : "Deleted 🎉",
+        icon: "success",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      Swal.fire({
+        title: "Error",
+        icon: "error",
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Something went wrong",
+      });
+    } finally {
+      setLoadingDelete(null);
     }
   };
   return (
@@ -203,7 +357,7 @@ export default function PageRole() {
             variant="outline"
             type="button"
             className="flex items-center gap-2 cursor-pointer bg-green-500 text-white hover:bg-green-600"
-            onClick={() => router.push("/admin/pages/roles/create")}
+            onClick={handleCreatePage}
           >
             <Plus className="w-4 h-4" />
 
@@ -266,15 +420,22 @@ export default function PageRole() {
                     >
                       <SquarePen className="w-4 h-4" />
                     </Button>
-                    <button>
-                      {" "}
-                      {/* {loadingToggleSuspend === blog._id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : blog.suspended ? (
-                        <Globe className="w-4 h-4" />
+                    <button
+                      type="button"
+                      className={`inline-flex items-center justify-center rounded-md border p-2 transition ${
+                        role.deletedAt
+                          ? "border-green-200 text-green-500 hover:bg-green-50"
+                          : "border-red-200 text-red-500 hover:bg-red-50"
+                      }`}
+                      onClick={() => handleDelete(role._id!, role?.deletedAt)}
+                    >
+                      {loadingDelete === role._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : role.deletedAt ? (
+                        <RotateCcw className="h-4 w-4" />
                       ) : (
-                        <Ban className="w-4 h-4" />
-                      )} */}
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </button>
                   </td>
                 </tr>
@@ -311,6 +472,11 @@ export default function PageRole() {
               className="max-h-[70vh] space-y-6 overflow-y-auto px-6 py-5"
               onSubmit={handleSubmitFromUpdate}
             >
+              {formErrorEdit.other && (
+                <p className="text-sm text-red-500 mt-1">
+                  {formErrorEdit.other}
+                </p>
+              )}
               {/* Role Name */}
               <FieldGroup>
                 <Field className="space-y-2">
@@ -324,6 +490,11 @@ export default function PageRole() {
                     placeholder="Enter role name"
                     className="h-11"
                   />
+                  {formErrorEdit.name && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {formErrorEdit.name}
+                    </p>
+                  )}
                 </Field>
               </FieldGroup>
 
@@ -336,11 +507,17 @@ export default function PageRole() {
                     Select permissions for this role
                   </p>
                 </div>
+                {/* ✅ error permissions */}
+                {formErrorEdit.permissions.length > 0 && (
+                  <p className="text-sm text-red-500 mt-1 whitespace-pre-line">
+                    {formErrorEdit.permissions[0]}
+                  </p>
+                )}
 
                 <PermissionList
                   permissionGroups={permissionGroups}
                   selectedPermissions={formEdit.permissions}
-                  onToggle={handlePermissionChange}
+                  onToggle={handlePermissionChangEdit}
                 />
               </div>
 
@@ -362,6 +539,100 @@ export default function PageRole() {
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       "Save Changes"
+                    )}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+      {dialogCreate && (
+        <Dialog open={dialogCreate} onOpenChange={setDialogCreate}>
+          <DialogContent className="w-full overflow-hidden rounded-2xl border bg-background p-0 shadow-2xl sm:max-w-lg lg:max-w-3xl">
+            {/* Header */}
+            <DialogHeader className="border-b px-6 py-5">
+              <DialogTitle className="text-xl font-semibold">
+                Create Role
+              </DialogTitle>
+
+              <DialogDescription className="text-sm text-muted-foreground">
+                Manage role information and permissions.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Body */}
+            <form
+              className="max-h-[70vh] space-y-6 overflow-y-auto px-6 py-5"
+              onSubmit={handleCreate}
+            >
+              {formErrorCreate.other && (
+                <p className="text-sm text-red-500 mt-1">
+                  {formErrorCreate.other}
+                </p>
+              )}
+              {/* Role Name */}
+              <FieldGroup>
+                <Field className="space-y-2">
+                  <Label htmlFor="name">Role Name</Label>
+
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formCreate.name}
+                    onChange={onChangeCreate}
+                    placeholder="Enter role name"
+                    className="h-11"
+                  />
+                  {formErrorCreate.name && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {formErrorCreate.name}
+                    </p>
+                  )}
+                </Field>
+              </FieldGroup>
+
+              {/* Permissions */}
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base font-medium">Permissions</Label>
+
+                  <p className="text-sm text-muted-foreground">
+                    Select permissions for this role
+                  </p>
+                </div>
+                {/* ✅ error permissions */}
+                {formErrorCreate.permissions.length > 0 && (
+                  <p className="text-sm text-red-500 mt-1 whitespace-pre-line">
+                    {formErrorCreate.permissions[0]}
+                  </p>
+                )}
+
+                <PermissionList
+                  permissionGroups={permissionGroups}
+                  selectedPermissions={formCreate.permissions}
+                  onToggle={handlePermissionChangCreate}
+                />
+              </div>
+
+              {/* Footer */}
+              <DialogFooter className="sticky bottom-0 border-t bg-background px-0 pt-4">
+                <div className="flex w-full justify-end gap-2">
+                  <DialogClose asChild>
+                    <Button variant="outline" type="button">
+                      Cancel
+                    </Button>
+                  </DialogClose>
+
+                  <Button
+                    type="submit"
+                    className="min-w-28"
+                    disabled={loadingCreate}
+                  >
+                    {loadingCreate ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "create role"
                     )}
                   </Button>
                 </div>
