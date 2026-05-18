@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { Plus, SquarePen, Loader2, Trash2, RotateCcw } from "lucide-react";
+import {
+  Plus,
+  SquarePen,
+  Loader2,
+  Trash2,
+  RotateCcw,
+  EyeOff,
+  Eye,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { API_URL } from "@/app/lib/config";
 import { useAuth } from "@/app/context/AuthContext";
@@ -33,11 +41,13 @@ import {
 } from "@/app/components/admin/ui/field";
 import { permissionGroups } from "@/app/lib/admin/permission";
 import { PermissionList } from "@/app/components/admin/ui/permissions";
-
+import { motion } from "framer-motion";
+import { PaginationTable } from "@/app/components/admin/ui/pagination_custom";
 type Role = {
   _id: string;
   name: string;
   permissions: string[];
+  show: boolean;
   deletedAt: string | null;
 };
 type RoleForm = {
@@ -61,7 +71,6 @@ const initialFormError: RoleFormError = {
 export default function PageRole() {
   const router = useRouter();
   const { user } = useAuth();
-
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [page, setPage] = useState(1);
@@ -80,7 +89,9 @@ export default function PageRole() {
     useState<RoleFormError>(initialFormError);
   // debounce search
   const [loadingDelete, setLoadingDelete] = useState<string | null>(null);
-
+  const [loadingToggle, setLoadingToggle] = useState<string | null>(null);
+  const [totalPages, setTotalPages] = useState(1);
+  const [] = useState();
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -102,6 +113,7 @@ export default function PageRole() {
         },
       });
       setRoles(res.data.data || []);
+      setTotalPages(res.data.meta.totalPages);
     } catch (error: any) {
       Swal.fire({
         title: "Error",
@@ -340,6 +352,38 @@ export default function PageRole() {
       setLoadingDelete(null);
     }
   };
+  const handleToggle = async ({ id, show }: { id: string; show: boolean }) => {
+    setLoadingToggle(id);
+    try {
+      const res = axios.patch(
+        `${API_URL}/api/admin/roles/${id}/show/`,
+        { show: show },
+        {
+          withCredentials: true,
+        },
+      );
+      // อัพเดต state roles
+      setRoles((prev) =>
+        prev.map((r) => (r._id === id ? { ...r, show: show  } : r)),
+      );
+      Swal.fire({
+        title: "Success",
+        text: `Role ${show ? "enabled" : "disabled"} successfully`,
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error("Toggle role failed:", error);
+      Swal.fire({
+        title: "Error",
+        text: "Failed to toggle role",
+        icon: "error",
+      });
+    } finally {
+      setLoadingToggle(null);
+    }
+  };
   return (
     <ContentLayout title="Role">
       <div className="mb-6 space-y-4">
@@ -390,6 +434,7 @@ export default function PageRole() {
               <th className="px-4 py-3">Name</th>
 
               <th className="px-4 py-3">Permissions</th>
+              <th className="px-4 py-3">status</th>
 
               <th className="px-4 py-3">Deleted At</th>
 
@@ -410,7 +455,20 @@ export default function PageRole() {
                       ? role.permissions.join(", ")
                       : "-"}
                   </td>
-
+                  {/* Status */}
+                  <td className="px-4 py-4">
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-medium ${role.deletedAt ? "bg-gray-500/10 text-gray-600" : role.show === false ? "bg-red-500/10 text-red-600" : role.show === true ? "bg-green-500/10 text-green-600" : "bg-yellow-500/10 text-yellow-600"}`}
+                    >
+                      {role.deletedAt
+                        ? "Deleted"
+                        : role.show === false
+                          ? "Suspended"
+                          : role.show === true
+                            ? "Published"
+                            : "Draft"}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">{role.deletedAt || "-"}</td>
                   <td>
                     <Button
@@ -420,6 +478,22 @@ export default function PageRole() {
                     >
                       <SquarePen className="w-4 h-4" />
                     </Button>
+                    <button
+                      type="button"
+                      className={`inline-flex items-center justify-center rounded-md border p-2 transition ${role.show === false ? "border-green-200 text-green-500 hover:bg-green-50" : "border-red-200 text-red-500 hover:bg-red-50"}`}
+                      onClick={() =>
+                        handleToggle({ id: role._id, show: !role.show })
+                      }
+                    >
+                      {" "}
+                      {loadingDelete === role._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : role.show === false ? (
+                        <Eye className="h-4 w-4" />
+                      ) : (
+                        <EyeOff className="h-4 w-4" />
+                      )}
+                    </button>
                     <button
                       type="button"
                       className={`inline-flex items-center justify-center rounded-md border p-2 transition ${
@@ -452,6 +526,20 @@ export default function PageRole() {
             )}
           </tbody>
         </table>
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex justify-end pt-4"
+          >
+            <PaginationTable
+              page={page}
+              totalPages={totalPages}
+              onValueChange={(p) => setPage(p)}
+            />
+          </motion.div>
+        )}
       </div>
       {dialogEdit && (
         <Dialog open={dialogEdit} onOpenChange={setDialogEdit}>

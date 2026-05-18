@@ -61,7 +61,7 @@ export function getMenuList(pathname: string): Group[] {
         {
           href: "/admin/pages/categories/",
           label: "Categories",
-          icon: Bookmark
+          icon: Bookmark,
         },
         // {
         //   href: "/tags",
@@ -74,7 +74,7 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "role permission",
       menus: [
         {
-          href: "",
+          href: "", // ❓ ถ้าไม่ใช้จริงควรลบออก หรือใส่ path ที่ถูกต้อง
           label: "role",
           icon: SquarePen,
           submenus: [
@@ -82,10 +82,26 @@ export function getMenuList(pathname: string): Group[] {
               href: "/admin/pages/roles/",
               label: "All role",
             },
-            // {
-            //   href: "/admin/pages/permission/",
-            //   label: "permission",
-            // },
+            {
+              href: "/admin/pages/roles/role_manager",
+              label: "role manager",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      groupLabel: "user",
+      menus: [
+        {
+          href: "",
+          label: "user",
+          icon: SquarePen,
+          submenus: [
+            {
+              href: "/admin/pages/users/",
+              label: "Users",
+            },
           ],
         },
       ],
@@ -97,7 +113,7 @@ export function getMenuList(pathname: string): Group[] {
     //       href: "/users",
     //       label: "Users",
     //       icon: Users
-    //     },
+    //    },
     //     {
     //       href: "/account",
     //       label: "Account",

@@ -18,7 +18,7 @@ router.get(
   "/list/blogs",
   authMiddleware,
   requireRole("admin"),
-  requirePermission("blog_view"),
+  requirePermission("view_blog"),
   AdminController.listBlog,
 );
 
@@ -98,4 +98,24 @@ router.patch(
   AdminController.deleteRole,
 );
 
+router.patch("/roles/:id/show", authMiddleware, requireRole("admin"), AdminController.toggleRole);
+router.get("/roles/list", authMiddleware, requireRole("admin"), AdminController.listRoles);
+
+// pomision
+router.post("/permissions", AdminController.createPermission);
+
+router.get("/permissions", AdminController.listPermissions);
+
+router.patch("/permissions/:id", AdminController.updatePermission);
+
+router.delete("/permissions/:id", AdminController.deletePermission);
+
+// user
+router.post("/users", AdminController.createUser);
+
+router.get("/users", AdminController.listUsers);
+
+router.get("/users/:id", AdminController.getUserById);
+
+router.patch("/users/:id", AdminController.updateUser);
 export default router;

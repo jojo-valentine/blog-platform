@@ -5,6 +5,7 @@ const RoleSchema = new Schema<IRole>(
   {
     name: { type: String, required: true, unique: true },
     permissions: [{ type: String }],
+    show: { type: Boolean, default: true }, // เปิด/ปิดการแสดงผล
     deletedAt: { type: Date, default: undefined },
   },
   { timestamps: true },

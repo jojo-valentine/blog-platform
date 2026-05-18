@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { Blog, ImageBlog, ImageCategory, Role } from "../models";
+import { Blog, HasRole, ImageBlog, ImageCategory, Role } from "../models";
 import mongoose, { mongo, startSession } from "mongoose";
 
 class AdminController {
@@ -368,7 +368,7 @@ class AdminController {
 
       const [roles, total] = await Promise.all([
         Role.find(filter)
-          .select("_id name permissions deletedAt")
+          .select("_id name show permissions deletedAt")
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
@@ -430,7 +430,6 @@ class AdminController {
       await session.endSession();
     }
   }
-
   static async updateRole(req: Request, res: Response) {
     const id = req.params.id;
     const session = await startSession();
@@ -507,7 +506,6 @@ class AdminController {
       await session.endSession();
     }
   }
-
   static async deleteRole(req: Request, res: Response) {
     const id = req.params.id;
 
@@ -551,5 +549,206 @@ class AdminController {
       await session.endSession();
     }
   }
+
+  static async toggleRole(req: Request, res: Response) {
+    const id = req.params.id;
+
+    const session = await startSession();
+
+    try {
+      let updatedUserRole;
+
+      await session.withTransaction(async () => {
+        const { show } = req.body;
+        const result = await Role.findById(id).session(session);
+
+        if (!result) {
+          throw {
+            field: "other",
+            message: "User role not found",
+          };
+        }
+        result.show = show;
+
+        updatedUserRole = await result.save({ session });
+      });
+
+      return res.status(200).json({
+        message: "User role updated successfully",
+
+        data: updatedUserRole,
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+  static async listRolesShow(req: Request, res: Response) {
+    try {
+      const roles = await Role.find({ deletedAt: null })
+        .select("_id name show") // ✅ เลือก field ที่ต้องการ
+        .sort({ createdAt: -1 })
+        .lean();
+
+      return res.status(200).json({
+        message: "Roles fetched successfully",
+        data: roles,
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
+  static async listPermissions(req: Request, res: Response) {
+    try {
+      const page = Math.max(Number(req.query.page) || 1, 1);
+      const limit = Math.min(Number(req.query.limit) || 10, 50);
+      const skip = (page - 1) * limit;
+
+      // ✅ search
+      const q = (req.query.search as string)?.trim();
+      const tags = (req.query.tags as string)?.split(",");
+      const filter: any = {};
+      if (q) {
+        const orConditions: any[] = [
+          { resource: { $regex: q, $options: "i" } },
+        ];
+
+        // 🔥 ถ้า q เป็น ObjectId
+        if (mongoose.Types.ObjectId.isValid(q)) {
+          orConditions.push({ _id: new mongoose.Types.ObjectId(q) });
+        }
+
+        filter.$or = orConditions;
+      }
+      const [usersRole, totalData] = await Promise.all([
+        HasRole.aggregate([
+          {
+            $match: filter,
+          },
+          {
+            $sort: {
+              createdAt: -1,
+            },
+          },
+
+          {
+            $group: {
+              _id: "$user_id",
+
+              roles: {
+                $push: "$resource",
+              },
+
+              createdAt: {
+                $first: "$createdAt",
+              },
+            },
+          },
+
+          {
+            $lookup: {
+              from: "users",
+              localField: "_id",
+              foreignField: "_id",
+              as: "user",
+            },
+          },
+
+          {
+            $unwind: "$user",
+          },
+          // ✅ เลือก field ที่ต้องการ
+          {
+            $project: {
+              _id: 1,
+              "user.name": 1,
+              "user.email": 1,
+              roles: 1,
+              createdAt: 1,
+            },
+          },
+          {
+            $skip: skip,
+          },
+
+          {
+            $limit: limit,
+          },
+        ]),
+        HasRole.aggregate([
+          { $match: filter },
+          { $group: { _id: "$user_id" } },
+        ]),
+      ]);
+
+      const total = totalData.length;
+      return res.status(200).json({
+        message: "success",
+        data: usersRole,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
+  static async createPermission(req: Request, res: Response) {
+    const { roles, resource } = req.body;
+    const userId = req.user?.userId;
+    const session = await mongoose.startSession();
+    try {
+      let data;
+      await session.withTransaction(async () => {
+        for (const role of roles) {
+          const result = await HasRole.findOne({
+            user_id: userId,
+            role_id: role,
+          }).session(session);
+
+          if (!result) {
+            // ถ้าไม่เจอ → insert ใหม่
+            await HasRole.create(
+              [{ user_id: userId, role_id: role, resource: resource }],
+              {
+                session,
+              },
+            );
+          }
+        }
+      });
+      return res.status(200).json({
+        message: "Permissions create successfully",
+
+        data,
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      session.endSession();
+    }
+  }
+  static async updatePermission(req: Request, res: Response) {}
+  static async deletePermission(req: Request, res: Response) {}
+  static async createUser(req: Request, res: Response) {}
+  static async listUsers(req: Request, res: Response) {}
+  static async getUserById(req: Request, res: Response) {}
+  static async updateUser(req: Request, res: Response) {}
 }
 export default AdminController;
