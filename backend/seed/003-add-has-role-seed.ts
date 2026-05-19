@@ -28,7 +28,6 @@ async function seedHasRole() {
     const hasRoles = users.map((u) => ({
       role_id: u.email === "alice@example.com" ? adminRole._id : userRole._id,
       user_id: u._id,
-      resource: u.email === "alice@example.com" ? "admin" : "user",
     }));
 
     // insert

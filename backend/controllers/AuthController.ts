@@ -160,10 +160,9 @@ class AuthController {
           if (!role) throw new Error("Role not found"); // ✅ throw แทน return res
         }
         // 9. assign role
-        await HasRole.create(
-          [{ role_id: role._id, user_id: user._id, resource: "user" }],
-          { session },
-        );
+        await HasRole.create([{ role_id: role._id, user_id: user._id }], {
+          session,
+        });
 
         await Profile.create(
           [

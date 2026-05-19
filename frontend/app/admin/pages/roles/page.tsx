@@ -374,7 +374,7 @@ export default function PageRole() {
         showConfirmButton: false,
       });
     } catch (error: any) {
-      console.error("Toggle role failed:", error);
+      // console.error("Toggle role failed:", error);
       Swal.fire({
         title: "Error",
         text: "Failed to toggle role",

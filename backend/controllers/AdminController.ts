@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { Blog, HasRole, ImageBlog, ImageCategory, Role } from "../models";
 import mongoose, { mongo, startSession } from "mongoose";
+import { error } from "node:console";
 
 class AdminController {
   static async listBlog(req: Request, res: Response) {
@@ -617,7 +618,7 @@ class AdminController {
       const filter: any = {};
       if (q) {
         const orConditions: any[] = [
-          { resource: { $regex: q, $options: "i" } },
+          // { resource: { $regex: q, $options: "i" } },
         ];
 
         // 🔥 ถ้า q เป็น ObjectId
@@ -637,13 +638,16 @@ class AdminController {
               createdAt: -1,
             },
           },
-
+          // ✅ group roles by user
           {
             $group: {
               _id: "$user_id",
 
               roles: {
-                $push: "$resource",
+                $push: {
+                  // resource: "$resource",
+                  role_id: "$role_id",
+                },
               },
 
               createdAt: {
@@ -651,7 +655,7 @@ class AdminController {
               },
             },
           },
-
+          // ✅ user lookup
           {
             $lookup: {
               from: "users",
@@ -660,31 +664,70 @@ class AdminController {
               as: "user",
             },
           },
-
           {
             $unwind: "$user",
           },
-          // ✅ เลือก field ที่ต้องการ
+          // ✅ role lookup
+          {
+            $lookup: {
+              from: "roles",
+              localField: "roles.role_id",
+              foreignField: "_id",
+              as: "rolesData",
+            },
+          },
+          // ✅ map role names
+          {
+            $addFields: {
+              roles: {
+                $map: {
+                  input: "$rolesData",
+                  as: "role",
+
+                  in: {
+                    _id: "$$role._id",
+
+                    name: "$$role.name",
+
+                    permissions: "$$role.permissions",
+                  },
+                },
+              },
+            },
+          },
+          // ✅ project fields
           {
             $project: {
               _id: 1,
+              createdAt: 1,
+              // "user._id": 1,
               "user.name": 1,
               "user.email": 1,
+              "user.mobile": 1,
               roles: 1,
-              createdAt: 1,
             },
           },
           {
             $skip: skip,
           },
-
           {
             $limit: limit,
           },
         ]),
+
+        // ✅ total users
         HasRole.aggregate([
-          { $match: filter },
-          { $group: { _id: "$user_id" } },
+          {
+            $match: filter,
+          },
+          {
+            $group: {
+              _id: "$user_id",
+            },
+          },
+          {
+            $count: "total",
+          },
         ]),
       ]);
 
@@ -707,7 +750,7 @@ class AdminController {
     }
   }
   static async createPermission(req: Request, res: Response) {
-    const { roles, resource } = req.body;
+    const { roles } = req.body;
     const userId = req.user?.userId;
     const session = await mongoose.startSession();
     try {
@@ -721,12 +764,9 @@ class AdminController {
 
           if (!result) {
             // ถ้าไม่เจอ → insert ใหม่
-            await HasRole.create(
-              [{ user_id: userId, role_id: role, resource: resource }],
-              {
-                session,
-              },
-            );
+            await HasRole.create([{ user_id: userId, role_id: role }], {
+              session,
+            });
           }
         }
       });
@@ -744,8 +784,92 @@ class AdminController {
       session.endSession();
     }
   }
-  static async updatePermission(req: Request, res: Response) {}
-  static async deletePermission(req: Request, res: Response) {}
+  static async updatePermission(req: Request, res: Response) {
+    const { roles } = req.body;
+
+    const userId = req.params.id;
+
+    const session = await mongoose.startSession();
+
+    try {
+      let data;
+
+      await session.withTransaction(async () => {
+        // ✅ remove old roles
+        await HasRole.deleteMany(
+          {
+            user_id: new mongoose.Types.ObjectId(userId as string),
+          },
+          { session },
+        );
+
+        // ✅ create new roles
+        if (Array.isArray(roles) && roles.length > 0) {
+          await HasRole.insertMany(
+            roles.map((roleId: string) => ({
+              user_id: new mongoose.Types.ObjectId(userId as string),
+
+              role_id: new mongoose.Types.ObjectId(roleId),
+            })),
+            { session },
+          );
+        }
+
+        // ✅ get latest data
+        data = await HasRole.find({
+          user_id: new mongoose.Types.ObjectId(userId as string),
+        })
+          .populate("role_id", "name")
+          .session(session);
+      });
+
+      return res.status(200).json({
+        message: "Permissions updated successfully",
+
+        data,
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  static async deletePermission(req: Request, res: Response) {
+    const id = req.params.id;
+    const session = await mongoose.startSession();
+
+    try {
+      let deletedPermission;
+
+      await session.withTransaction(async () => {
+        const result = await HasRole.findById(id).session(session);
+        if (!result) {
+          throw new Error("Permission not found");
+        }
+
+        // ✅ ลบด้วย await
+        deletedPermission = await result.deleteOne({ session });
+      });
+
+      return res.status(200).json({
+        message: "Permission deleted successfully",
+        data: deletedPermission,
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+
   static async createUser(req: Request, res: Response) {}
   static async listUsers(req: Request, res: Response) {}
   static async getUserById(req: Request, res: Response) {}

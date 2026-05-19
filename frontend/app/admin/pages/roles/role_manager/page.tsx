@@ -23,10 +23,15 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/app/components/admin/ui/dialog";
-export type UserRole = {
+import { CategoryCheckBox } from "@/app/components/ui/categoryCheckBox";
+export type RoleItem = {
+  name: string;
+  _id: string;
+};
+export type permissions = {
   _id: string;
   createdAt?: string;
-  roles: string[];
+  roles: RoleItem[];
 
   user: {
     name: string;
@@ -34,28 +39,32 @@ export type UserRole = {
   };
 };
 // formEditError
-export type UserRoleError = {
+export type permissionsError = {
+  _id?: string;
   roles: string[];
   user: {
     name: string;
     email: string;
   };
 };
-export type formRole = {
-  roles: string[];
+export type formPermissions = {
+  _id?: string;
+  roles: RoleItem[];
   user: {
     name: string;
     email: string;
   };
 };
-const initialForm: formRole = {
+const initialForm: formPermissions = {
+  _id: "",
   user: {
     name: "",
     email: "",
   },
-  roles: [] as string[],
+  roles: [] as RoleItem[],
 };
-const initialFormError: UserRoleError = {
+const initialFormError: permissionsError = {
+  _id: "",
   user: {
     name: "",
     email: "",
@@ -63,17 +72,19 @@ const initialFormError: UserRoleError = {
   roles: [] as string[],
 };
 export default function pageRoleManager() {
-  const [roles, setRoles] = useState<UserRole[]>([]);
+  const [permissions, setPermissions] = useState<permissions[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [totalPages, setTotalPages] = useState(1);
   const [dialogEdit, setDialogEdit] = useState(false);
-  const [formEdit, setFormEdit] = useState<formRole>(initialForm);
+  const [formEdit, setFormEdit] = useState<formPermissions>(initialForm);
   const [formEditError, setFormEditError] =
-    useState<UserRoleError>(initialFormError);
+    useState<permissionsError>(initialFormError);
   const [loadingEdit, setLoadingEdit] = useState(false);
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -87,7 +98,7 @@ export default function pageRoleManager() {
         },
       });
       setTotalPages(res.data.meta.totalPages);
-      setRoles(res.data.data);
+      setPermissions(res.data.data);
     } catch (error: any) {
       Swal.fire({
         title: "Error",
@@ -98,6 +109,25 @@ export default function pageRoleManager() {
       setLoading(false);
     }
   }, [debouncedSearch, page]);
+
+  const fetchDataRole = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/roles/list`, {
+        withCredentials: true,
+      });
+      setRoles(res.data.data);
+    } catch (error: any) {
+      Swal.fire({
+        title: "Error",
+        icon: "error",
+        text: error.response?.data?.message || error.message || "Fetch failed",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -108,18 +138,130 @@ export default function pageRoleManager() {
   useEffect(() => {
     if (user) {
       fetchData();
+      fetchDataRole();
     }
-  }, [user, fetchData]);
-
-  const handleEdit = async ({ id, role }: { id: string; role: string[] }) => {
+  }, [user, fetchData, fetchDataRole]);
+  const handleRoles = useCallback((ids: string[]) => {
+    setSelectedIds((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(ids)) return prev;
+      return ids;
+    });
+    setPage(1);
+  }, []);
+  const handleEdit = async ({ id, role }: { id: string; role: RoleItem[] }) => {
     setDialogEdit(true);
-    setLoadingEdit(true);
+
+    const perm = await permissions.find((p) => p._id === id);
+    if (!perm) return;
+    setFormEdit(perm);
     setFormEdit((prev) => ({
       ...prev,
       roles: role, // ✅ set ทั้ง array ตรง ๆ
     }));
   };
+  const handleChangeEdit = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    role?: RoleItem,
+  ) => {
+    const { name, type, value, checked } = e.target;
 
+    if (type === "checkbox" && role) {
+      setFormEdit((prev) => ({
+        ...prev,
+        roles: checked
+          ? [...prev.roles, role] // ✅ เพิ่ม role object
+          : prev.roles.filter((r) => r._id !== role._id), // ✅ ลบ role object
+      }));
+    } else {
+      setFormEdit((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+
+    setFormEditError((prev) => ({
+      ...prev,
+      [name]: "",
+    }));
+  };
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const rolesData = formEdit.roles.map((r) => r._id);
+
+    try {
+      setLoadingEdit(true);
+      setFormEditError(structuredClone(initialFormError));
+
+      const res = await axios.patch(
+        `${API_URL}/api/admin/permissions/${formEdit._id}`,
+        { roles: rolesData },
+        {
+          withCredentials: true,
+        },
+      );
+
+      // ✅ update state
+      setPermissions((prev) =>
+        prev.map((item) =>
+          item._id === formEdit._id
+            ? {
+                ...item,
+
+                roles: res.data.data.map((r: any) => ({
+                  _id: r.role_id._id,
+
+                  name: r.role_id.name,
+                })),
+              }
+            : item,
+        ),
+      );
+      Swal.fire({
+        title: "Updated 🎉",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      setDialogEdit(false);
+    } catch (error: any) {
+      const err = error.response?.data;
+
+      // ✅ validation errors
+      if (Array.isArray(err?.errors)) {
+        const fieldErrors = structuredClone(initialFormError);
+
+        err.errors.forEach(
+          (e: { field: keyof permissionsError; message: string }) => {
+            if (typeof e.field === "string" && e.field.includes("roles")) {
+              (fieldErrors.roles as string[]).push(e.message);
+            } else if (e.field in fieldErrors) {
+              (fieldErrors as any)[e.field] = e.message;
+            } else {
+              (fieldErrors as any).other = e.message;
+            }
+          },
+        );
+
+        setFormEditError(fieldErrors);
+        Swal.fire({
+          title: "Validation Error",
+          icon: "error",
+          text: "Please check your inputs",
+        });
+
+        return;
+      }
+      // ✅ normal error
+      Swal.fire({
+        title: "Error",
+        icon: "error",
+        text: err?.message || error.message || "Update failed",
+      });
+    } finally {
+      setLoadingEdit(false);
+    }
+  };
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
@@ -138,6 +280,16 @@ export default function pageRoleManager() {
               </p>
             </div>
 
+            {/* Category */}
+            <div className="space-y-2">
+              <Label>Categories</Label>
+
+              <CategoryCheckBox
+                value={selectedIds}
+                categories={roles}
+                onValueChange={handleRoles}
+              />
+            </div>
             <Button
               variant="outline"
               type="button"
@@ -167,19 +319,19 @@ export default function pageRoleManager() {
               <tbody>
                 {loading ? (
                   <TableSkeleton length={5} colSpan={3} />
-                ) : roles.length > 0 ? (
-                  roles.map((role, index) => (
+                ) : permissions.length > 0 ? (
+                  permissions.map((permission, index) => (
                     <tr
-                      key={role._id || index}
+                      key={permission._id || index}
                       className="border-b transition hover:bg-muted/30"
                     >
                       {/* User */}
                       <td className="px-4 py-3">
                         <div className="space-y-1">
-                          <p className="font-medium">{role.user.name}</p>
+                          <p className="font-medium">{permission.user.name}</p>
 
                           <p className="text-xs text-muted-foreground">
-                            {role.user.email}
+                            {permission.user.email}
                           </p>
                         </div>
                       </td>
@@ -187,12 +339,12 @@ export default function pageRoleManager() {
                       {/* Roles */}
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
-                          {role.roles.map((item) => (
+                          {permission.roles.map((item) => (
                             <span
-                              key={item}
+                              key={item._id}
                               className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary"
                             >
-                              {item}
+                              {item.name}
                             </span>
                           ))}
                         </div>
@@ -200,8 +352,8 @@ export default function pageRoleManager() {
 
                       {/* Created */}
                       <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {role.createdAt
-                          ? new Date(role.createdAt).toLocaleDateString()
+                        {permission.createdAt
+                          ? new Date(permission.createdAt).toLocaleDateString()
                           : "-"}
                       </td>
 
@@ -212,7 +364,10 @@ export default function pageRoleManager() {
                             size="icon"
                             variant="outline"
                             onClick={() =>
-                              handleEdit({ id: role._id, role: role.roles })
+                              handleEdit({
+                                id: permission._id,
+                                role: permission.roles,
+                              })
                             }
                           >
                             <SquarePen className="h-4 w-4" />
@@ -265,11 +420,7 @@ export default function pageRoleManager() {
                 Update user role permissions.
               </DialogDescription>
             </DialogHeader>
-
-            <form
-              className="space-y-6"
-              // onSubmit={handleSubmitEdit}
-            >
+            <form className="space-y-6" onSubmit={handleSubmitEdit}>
               {/* User Info */}
               <div className="rounded-lg border bg-muted/30 p-4">
                 <p className="font-medium">{formEdit.user?.name}</p>
@@ -290,21 +441,24 @@ export default function pageRoleManager() {
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
-                  {/* {rolesList.map((role) => (
-                    <label
-                      key={role}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition hover:bg-muted/50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formEdit.roles.includes(role)}
-                        // onChange={() => handleRoleToggle(role)}
-                        className="h-4 w-4"
-                      />
+                  {roles.map((role) => {
+                    return (
+                      <label
+                        key={role._id}
+                        className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition hover:bg-muted/50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formEdit.roles.some(
+                            (r) => r._id === role._id,
+                          )}
+                          onChange={(e) => handleChangeEdit(e, role)}
+                        />
 
-                      <span className="capitalize">{role}</span>
-                    </label>
-                  ))} */}
+                        <span className="capitalize">{role.name}</span>
+                      </label>
+                    );
+                  })}
                 </div>
 
                 {formEditError.roles && (
