@@ -63,6 +63,22 @@ const initialForm: formPermissions = {
   },
   roles: [] as RoleItem[],
 };
+export type formCreate = {
+  users: any[];
+  roles: RoleItem[];
+};
+const initialFormCreate: formCreate = {
+  users: [],
+  roles: [],
+};
+export type formCreateError = {
+  user: any[];
+  roles: RoleItem[];
+};
+const initialFormCreateError: formCreateError = {
+  user: [],
+  roles: [],
+};
 const initialFormError: permissionsError = {
   _id: "",
   user: {
@@ -75,6 +91,7 @@ export default function pageRoleManager() {
   const [permissions, setPermissions] = useState<permissions[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingRole, setLoadingRole] = useState(false);
   const { user } = useAuth();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -86,6 +103,16 @@ export default function pageRoleManager() {
   const [formEditError, setFormEditError] =
     useState<permissionsError>(initialFormError);
   const [loadingEdit, setLoadingEdit] = useState(false);
+  // const [formEdit, setDialogCreate] = useState<formPermissions>(initialForm);
+  const [dialogCreate, setDialogCreate] = useState(false);
+  const [formCreate, setFormCreate] = useState<formCreate>(initialFormCreate);
+  const [usersPermission, setUsersPermission] = useState<[]>([]);
+  const [formCreateError, setFromCreateError] = useState<formCreateError>(
+    initialFormCreateError,
+  );
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [loadingCreate, setLoadingCreate] = useState(false);
+  const [loadingDeleteId, setLoadingDeleteId] = useState<string | null>(null);
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -95,10 +122,11 @@ export default function pageRoleManager() {
           page,
           limit: 10,
           search: debouncedSearch,
+          category: selectedIds,
         },
       });
-      setTotalPages(res.data.meta.totalPages);
       setPermissions(res.data.data);
+      setTotalPages(res.data.meta.totalPages);
     } catch (error: any) {
       Swal.fire({
         title: "Error",
@@ -108,10 +136,10 @@ export default function pageRoleManager() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, page]);
+  }, [selectedIds, page, debouncedSearch]);
 
   const fetchDataRole = useCallback(async () => {
-    setLoading(true);
+    setLoadingRole(true);
     try {
       const res = await axios.get(`${API_URL}/api/admin/roles/list`, {
         withCredentials: true,
@@ -124,23 +152,25 @@ export default function pageRoleManager() {
         text: error.response?.data?.message || error.message || "Fetch failed",
       });
     } finally {
-      setLoading(false);
+      setLoadingRole(false);
     }
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [search]);
-  useEffect(() => {
-    if (user) {
-      fetchData();
-      fetchDataRole();
+  const fetchDataUsers = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/list/user/`, {
+        withCredentials: true,
+      });
+      setUsersPermission(res.data.data);
+    } catch (error: any) {
+      Swal.fire({
+        title: "Error",
+        icon: "error",
+        text: error.response?.data?.message || error.message || "Fetch failed",
+      });
     }
-  }, [user, fetchData, fetchDataRole]);
+  }, []);
+
   const handleRoles = useCallback((ids: string[]) => {
     setSelectedIds((prev) => {
       if (JSON.stringify(prev) === JSON.stringify(ids)) return prev;
@@ -148,6 +178,10 @@ export default function pageRoleManager() {
     });
     setPage(1);
   }, []);
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    setPage(1); // reset page เมื่อเปลี่ยน keyword
+  };
   const handleEdit = async ({ id, role }: { id: string; role: RoleItem[] }) => {
     setDialogEdit(true);
 
@@ -226,11 +260,9 @@ export default function pageRoleManager() {
       setDialogEdit(false);
     } catch (error: any) {
       const err = error.response?.data;
-
       // ✅ validation errors
       if (Array.isArray(err?.errors)) {
         const fieldErrors = structuredClone(initialFormError);
-
         err.errors.forEach(
           (e: { field: keyof permissionsError; message: string }) => {
             if (typeof e.field === "string" && e.field.includes("roles")) {
@@ -242,7 +274,6 @@ export default function pageRoleManager() {
             }
           },
         );
-
         setFormEditError(fieldErrors);
         Swal.fire({
           title: "Validation Error",
@@ -262,6 +293,174 @@ export default function pageRoleManager() {
       setLoadingEdit(false);
     }
   };
+  const handleChangeCreate = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    role?: RoleItem,
+  ) => {
+    const { name, type, value, checked } = e.target as HTMLInputElement;
+
+    if (type === "checkbox" && role) {
+      setFormCreate((prev) => ({
+        ...prev,
+        roles: checked
+          ? [...prev.roles, role] // ✅ เพิ่ม role object
+          : prev.roles.filter((r) => r._id !== role._id), // ✅ ลบ role object
+      }));
+    } else {
+      setFormCreate((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+
+    setFromCreateError((prev) => ({
+      ...prev,
+      [name]: "",
+    }));
+  };
+  const handleCreatePage = () => {
+    setDialogCreate(true);
+    setFormCreate((prev) => ({
+      ...prev,
+      users: usersPermission,
+    }));
+  };
+  const handleSubmitCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoadingCreate(true);
+      const res = await axios.post(
+        `${API_URL}/api/admin/permissions`,
+        {
+          user_id: selectedUserId,
+          roles: formCreate.roles.map((r) => r._id),
+        },
+        {
+          withCredentials: true,
+        },
+      );
+
+      Swal.fire({
+        title: "success 🎉",
+        text: "Role has been create success.",
+        icon: "success",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+      // [res.data.data, ...prev]
+      setPermissions((prev) => {
+        const exists = prev.some((p) => p._id === res.data.data._id);
+
+        if (exists) {
+          return prev.map((p) =>
+            p._id === res.data.data._id ? res.data.data : p,
+          );
+        }
+
+        return [res.data.data, ...prev];
+      });
+    } catch (error: any) {
+      const err = error.response?.data;
+      // ✅ validation errors
+      if (Array.isArray(err?.errors)) {
+        const fieldErrors = structuredClone(initialFormCreateError);
+        err.errors.forEach(
+          (e: { field: keyof formCreateError; message: string }) => {
+            if (typeof e.field === "string" && e.field.includes("roles")) {
+              fieldErrors.roles.push({
+                _id: "error",
+                name: e.message,
+              });
+            } else if (e.field in fieldErrors) {
+              (fieldErrors as any)[e.field] = e.message;
+            } else {
+              (fieldErrors as any).other = e.message;
+            }
+          },
+        );
+        setFromCreateError(fieldErrors);
+        Swal.fire({
+          title: "Validation Error",
+          icon: "error",
+          text: "Please check your inputs",
+        });
+
+        return;
+      }
+      // ✅ normal error
+      Swal.fire({
+        title: "Error",
+        icon: "error",
+        text: err?.message || error.message || "Update failed",
+      });
+    } finally {
+      setLoadingCreate(false);
+    }
+  };
+
+  const handleDeletePermission = async (id: string) => {
+    const result = await Swal.fire({
+      title: "Delete permission?",
+      text: "This action cannot be undone.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+    });
+
+    // ✅ cancel
+    if (!result.isConfirmed) return;
+
+    try {
+      setLoadingDeleteId(id);
+
+      await axios.delete(`${API_URL}/api/admin/permissions/${id}`, {
+        withCredentials: true,
+      });
+
+      // ✅ remove state
+      setPermissions((prev) => prev.filter((p) => p._id !== id));
+
+      Swal.fire({
+        title: "Deleted",
+        text: "Permission deleted successfully.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      Swal.fire({
+        title: "Delete Error",
+        text: "Something went wrong.",
+        icon: "error",
+      });
+    } finally {
+      setLoadingDeleteId(null);
+    }
+  };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+  useEffect(() => {
+    if (user) {
+      fetchData();
+      fetchDataRole();
+      fetchDataUsers();
+    }
+  }, [
+    user,
+    fetchData,
+    fetchDataRole,
+    fetchDataUsers,
+    page,
+    debouncedSearch,
+    selectedIds,
+  ]);
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
@@ -271,48 +470,75 @@ export default function pageRoleManager() {
       <ContentLayout title="role manager">
         <div className="mb-6 space-y-4">
           {/* Header */}
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-foreground">Roles</h2>
+          <div className="w-full rounded-2xl border bg-background p-5 shadow-sm">
+            <div className="flex flex-col gap-6">
+              {/* Header */}
+              <div className="flex flex-col gap-1">
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                  Roles
+                </h2>
 
-              <p className="text-sm text-muted-foreground">
-                Manage roles and permissions
-              </p>
+                <p className="text-sm text-muted-foreground">
+                  Manage roles and permissions
+                </p>
+              </div>
+
+              {/* Search */}
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm font-medium">Search</Label>
+
+                <input
+                  type="text"
+                  placeholder="Search roles..."
+                  value={search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 lg:w-[320px]"
+                />
+              </div>
+
+              {/* Bottom */}
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                {/* Categories */}
+                <div className="flex-1 space-y-2">
+                  <Label className="text-sm font-medium">Categories</Label>
+
+                  <div className="rounded-xl border bg-muted/30 p-4">
+                    {loadingRole ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading roles...
+                      </div>
+                    ) : (
+                      <CategoryCheckBox
+                        value={selectedIds}
+                        categories={roles}
+                        onValueChange={handleRoles}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Button */}
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="h-11 rounded-xl bg-green-500 px-5 text-white transition hover:bg-green-600"
+                  onClick={handleCreatePage}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Role
+                </Button>
+              </div>
             </div>
-
-            {/* Category */}
-            <div className="space-y-2">
-              <Label>Categories</Label>
-
-              <CategoryCheckBox
-                value={selectedIds}
-                categories={roles}
-                onValueChange={handleRoles}
-              />
-            </div>
-            <Button
-              variant="outline"
-              type="button"
-              className="flex items-center gap-2 cursor-pointer bg-green-500 text-white hover:bg-green-600"
-              // onClick={handleCreatePage}
-            >
-              <Plus className="w-4 h-4" />
-
-              <span>Add Role</span>
-            </Button>
           </div>
-
           {/* Table */}
           <div className="relative overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
             <table className="w-full text-left text-sm text-body">
               <thead className="border-b bg-muted/50">
                 <tr>
                   <th className="px-4 py-3">Name</th>
-
                   <th className="px-4 py-3">Permissions</th>
-
                   <th className="px-4 py-3">Deleted At</th>
-
                   <th className="px-4 py-3 text-left">Actions</th>
                 </tr>
               </thead>
@@ -373,8 +599,19 @@ export default function pageRoleManager() {
                             <SquarePen className="h-4 w-4" />
                           </Button>
 
-                          <Button size="icon" variant="destructive">
-                            <Trash2 className="h-4 w-4" />
+                          <Button
+                            size="icon"
+                            variant="destructive"
+                            disabled={loadingDeleteId === permission._id}
+                            onClick={() =>
+                              handleDeletePermission(permission._id)
+                            }
+                          >
+                            {loadingDeleteId === permission._id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
                           </Button>
                         </div>
                       </td>
@@ -477,6 +714,100 @@ export default function pageRoleManager() {
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {dialogCreate && (
+        <Dialog open={dialogCreate} onOpenChange={setDialogCreate}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>create User Roles</DialogTitle>
+
+              <DialogDescription>
+                create user role permissions.
+              </DialogDescription>
+            </DialogHeader>
+            <form className="space-y-6" onSubmit={handleSubmitCreate}>
+              {/* User Info */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">User</label>
+
+                <select
+                  className=" w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-primary"
+                  name="user_id"
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                >
+                  <option value="">Select user</option>
+
+                  {formCreate.users.map((u) => (
+                    <option key={u._id} value={u._id}>
+                      {u.name || u.profile?.display_name}
+                      {" - "}
+                      {u.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {formCreateError.user && (
+                <p className="text-red-500 text-sm">{formCreateError.user}</p>
+              )}
+
+              {/* Roles */}
+              <div className="space-y-3">
+                <div>
+                  <Label>User Roles</Label>
+
+                  <p className="text-sm text-muted-foreground">
+                    Select roles for this user
+                  </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  {roles.map((role) => {
+                    return (
+                      <label
+                        key={role._id}
+                        className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition hover:bg-muted/50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formCreate.roles.some(
+                            (r) => r._id === role._id,
+                          )}
+                          onChange={(e) => handleChangeCreate(e, role)}
+                        />
+
+                        <span className="capitalize">{role.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {formEditError.roles && (
+                  <p className="text-sm text-red-500">{formEditError.roles}</p>
+                )}
+              </div>
+
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button type="submit" disabled={loadingCreate}>
+                  {loadingCreate ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      created...
                     </>
                   ) : (
                     "Save Changes"

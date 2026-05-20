@@ -171,61 +171,58 @@ export default function pagePosts() {
       setLoadingToggleSuspend(null);
     }
   };
-const deleteBlog = async (id: string) => {
-  const result = await Swal.fire({
-    title: "Delete blog?",
-    text: "You won't be able to revert this!",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#ef4444",
-    cancelButtonColor: "#6b7280",
-    confirmButtonText: "Yes, delete it",
-    cancelButtonText: "Cancel",
-    reverseButtons: true,
-  });
-
-  // ❌ กดยกเลิก
-  if (!result.isConfirmed) return;
-
-  setLoadingDeleteId(id);
-
-  try {
-    await axios.delete(`${API_URL}/api/blog/${id}/delete`, {
-      withCredentials: true,
+  const deleteBlog = async (id: string) => {
+    const result = await Swal.fire({
+      title: "Delete blog?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
     });
 
-    // ✅ update state
-    setBlogs((prev) =>
-      prev.map((blog) =>
-        blog._id === id
-          ? {
-              ...blog,
-              deletedAt: new Date().toISOString(),
-            }
-          : blog,
-      ),
-    );
+    // ❌ กดยกเลิก
+    if (!result.isConfirmed) return;
 
-    Swal.fire({
-      title: "Deleted 🎉",
-      text: "Blog has been deleted.",
-      icon: "success",
-      timer: 1200,
-      showConfirmButton: false,
-    });
-  } catch (error: any) {
-    Swal.fire({
-      title: "Error",
-      icon: "error",
-      text:
-        error.response?.data?.message ||
-        error.message ||
-        "Delete failed",
-    });
-  } finally {
-    setLoadingDeleteId(null);
-  }
-};
+    setLoadingDeleteId(id);
+
+    try {
+      await axios.delete(`${API_URL}/api/blog/${id}/delete`, {
+        withCredentials: true,
+      });
+
+      // ✅ update state
+      setBlogs((prev) =>
+        prev.map((blog) =>
+          blog._id === id
+            ? {
+                ...blog,
+                deletedAt: new Date().toISOString(),
+              }
+            : blog,
+        ),
+      );
+
+      Swal.fire({
+        title: "Deleted 🎉",
+        text: "Blog has been deleted.",
+        icon: "success",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      Swal.fire({
+        title: "Error",
+        icon: "error",
+        text: error.response?.data?.message || error.message || "Delete failed",
+      });
+    } finally {
+      setLoadingDeleteId(null);
+    }
+  };
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);

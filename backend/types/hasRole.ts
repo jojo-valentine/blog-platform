@@ -3,4 +3,5 @@ import mongoose, { Document, Schema, model } from "mongoose";
 export interface IHasRole extends Document {
   role_id: mongoose.Types.ObjectId;
   user_id: mongoose.Types.ObjectId;
+  deletedAt: Date | null;
 }

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { Blog, HasRole, ImageBlog, ImageCategory, Role } from "../models";
+import { Blog, HasRole, ImageBlog, ImageCategory, Role, User } from "../models";
 import mongoose, { mongo, startSession } from "mongoose";
 import { error } from "node:console";
 
@@ -612,129 +612,194 @@ class AdminController {
       const limit = Math.min(Number(req.query.limit) || 10, 50);
       const skip = (page - 1) * limit;
 
-      // ✅ search
       const q = (req.query.search as string)?.trim();
-      const tags = (req.query.tags as string)?.split(",");
-      const filter: any = {};
-      if (q) {
-        const orConditions: any[] = [
-          // { resource: { $regex: q, $options: "i" } },
+
+      // ✅ category query
+      const categoryRaw = req.query.category || req.query["category[]"];
+
+      const category = Array.isArray(categoryRaw)
+        ? categoryRaw
+        : typeof categoryRaw === "string"
+          ? categoryRaw.split(",")
+          : [];
+
+      // ✅ validate ObjectId
+      const validCategoryIds = category
+        .filter(
+          (id): id is string =>
+            typeof id === "string" && mongoose.Types.ObjectId.isValid(id),
+        )
+        .map((id) => new mongoose.Types.ObjectId(id));
+
+      // ✅ pre filter
+      const preFilter: any = {};
+
+      // ✅ search by object id
+      if (q && mongoose.Types.ObjectId.isValid(q)) {
+        preFilter.$or = [
+          {
+            user_id: new mongoose.Types.ObjectId(q),
+          },
+          {
+            role_id: new mongoose.Types.ObjectId(q),
+          },
         ];
-
-        // 🔥 ถ้า q เป็น ObjectId
-        if (mongoose.Types.ObjectId.isValid(q)) {
-          orConditions.push({ _id: new mongoose.Types.ObjectId(q) });
-        }
-
-        filter.$or = orConditions;
       }
-      const [usersRole, totalData] = await Promise.all([
-        HasRole.aggregate([
-          {
-            $match: filter,
-          },
-          {
-            $sort: {
-              createdAt: -1,
-            },
-          },
-          // ✅ group roles by user
-          {
-            $group: {
-              _id: "$user_id",
 
-              roles: {
-                $push: {
-                  // resource: "$resource",
-                  role_id: "$role_id",
+      // ✅ search name/email after lookup
+      const postMatch =
+        q && !mongoose.Types.ObjectId.isValid(q)
+          ? [
+              {
+                $match: {
+                  $or: [
+                    {
+                      "user.name": {
+                        $regex: q,
+                        $options: "i",
+                      },
+                    },
+                    {
+                      "user.email": {
+                        $regex: q,
+                        $options: "i",
+                      },
+                    },
+                  ],
                 },
               },
+            ]
+          : [];
 
-              createdAt: {
-                $first: "$createdAt",
-              },
+      const pipeline: any[] = [
+        // ✅ match before group
+        {
+          $match: {
+            ...preFilter,
+
+            deletedAt: null,
+          },
+        },
+
+        // ✅ group by user
+        {
+          $group: {
+            _id: "$user_id",
+
+            roles: {
+              $addToSet: "$role_id",
+            },
+
+            createdAt: {
+              $first: "$createdAt",
             },
           },
-          // ✅ user lookup
-          {
-            $lookup: {
-              from: "users",
-              localField: "_id",
-              foreignField: "_id",
-              as: "user",
-            },
-          },
-          {
-            $unwind: "$user",
-          },
-          // ✅ role lookup
-          {
-            $lookup: {
-              from: "roles",
-              localField: "roles.role_id",
-              foreignField: "_id",
-              as: "rolesData",
-            },
-          },
-          // ✅ map role names
-          {
-            $addFields: {
-              roles: {
-                $map: {
-                  input: "$rolesData",
-                  as: "role",
+        },
 
-                  in: {
-                    _id: "$$role._id",
-
-                    name: "$$role.name",
-
-                    permissions: "$$role.permissions",
+        // ✅ filter AFTER group
+        ...(validCategoryIds.length > 0
+          ? [
+              {
+                $match: {
+                  roles: {
+                    $in: validCategoryIds,
                   },
                 },
               },
-            },
-          },
-          // ✅ project fields
-          {
-            $project: {
-              _id: 1,
-              createdAt: 1,
-              // "user._id": 1,
-              "user.name": 1,
-              "user.email": 1,
-              "user.mobile": 1,
-              roles: 1,
-            },
-          },
-          {
-            $skip: skip,
-          },
-          {
-            $limit: limit,
-          },
-        ]),
+            ]
+          : []),
 
-        // ✅ total users
-        HasRole.aggregate([
-          {
-            $match: filter,
+        // ✅ sort
+        {
+          $sort: {
+            createdAt: -1,
           },
-          {
-            $group: {
-              _id: "$user_id",
+        },
+
+        // ✅ lookup user
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "user",
+          },
+        },
+
+        {
+          $unwind: "$user",
+        },
+
+        // ✅ search name/email
+        ...postMatch,
+
+        // ✅ lookup roles
+        {
+          $lookup: {
+            from: "roles",
+            localField: "roles",
+            foreignField: "_id",
+            as: "rolesData",
+          },
+        },
+
+        // ✅ map roles
+        {
+          $addFields: {
+            roles: {
+              $map: {
+                input: "$rolesData",
+                as: "role",
+
+                in: {
+                  _id: "$$role._id",
+
+                  name: "$$role.name",
+
+                  permissions: "$$role.permissions",
+
+                  deletedAt: "$$role.deletedAt",
+                },
+              },
             },
           },
+        },
+
+        // ✅ project
+        {
+          $project: {
+            _id: 1,
+
+            createdAt: 1,
+
+            "user._id": 1,
+            "user.name": 1,
+            "user.email": 1,
+            "user.mobile": 1,
+
+            roles: 1,
+          },
+        },
+      ];
+
+      const [usersRole, totalData] = await Promise.all([
+        HasRole.aggregate([...pipeline, { $skip: skip }, { $limit: limit }]),
+
+        HasRole.aggregate([
+          ...pipeline,
           {
             $count: "total",
           },
         ]),
       ]);
 
-      const total = totalData.length;
+      const total = totalData[0]?.total || 0;
+
       return res.status(200).json({
         message: "success",
+
         data: usersRole,
+
         meta: {
           page,
           limit,
@@ -745,35 +810,91 @@ class AdminController {
     } catch (err: unknown) {
       return res.status(500).json({
         message: "Server error",
+
         error: err instanceof Error ? err.message : "Unknown error",
       });
     }
   }
   static async createPermission(req: Request, res: Response) {
-    const { roles } = req.body;
-    const userId = req.user?.userId;
+    const { roles, user_id } = req.body;
     const session = await mongoose.startSession();
+
+    // ✅ validate ก่อน transaction
+    if (!mongoose.Types.ObjectId.isValid(user_id)) {
+      return res.status(400).json({
+        message: "Validation error",
+        errors: [{ field: "user_id", message: "Invalid user id" }],
+      });
+    }
+
+    if (!Array.isArray(roles) || roles.length === 0) {
+      return res.status(400).json({
+        message: "Validation error",
+        errors: [{ field: "roles", message: "Roles required" }],
+      });
+    }
+
+    // ✅ validate role ids
+    const invalidRoles = roles.filter(
+      (r) => !mongoose.Types.ObjectId.isValid(r),
+    );
+    if (invalidRoles.length > 0) {
+      return res.status(400).json({
+        message: "Validation error",
+        errors: [{ field: "roles", message: "Invalid role id" }],
+      });
+    }
+
     try {
-      let data;
+      let data: any[] = [];
+
       await session.withTransaction(async () => {
+        const toInsert = [];
+
         for (const role of roles) {
-          const result = await HasRole.findOne({
-            user_id: userId,
-            role_id: role,
+          const exists = await HasRole.findOne({
+            user_id: new mongoose.Types.ObjectId(user_id),
+            role_id: new mongoose.Types.ObjectId(role),
           }).session(session);
 
-          if (!result) {
-            // ถ้าไม่เจอ → insert ใหม่
-            await HasRole.create([{ user_id: userId, role_id: role }], {
-              session,
-            });
+          if (!exists) {
+            toInsert.push({ user_id, role_id: role });
           }
         }
-      });
-      return res.status(200).json({
-        message: "Permissions create successfully",
 
-        data,
+        if (toInsert.length > 0) {
+          await HasRole.insertMany(toInsert, { session });
+        }
+
+        data = await HasRole.find({
+          user_id: new mongoose.Types.ObjectId(user_id),
+        })
+          .populate("role_id", "name")
+          .populate({
+            path: "user_id",
+            select: "name email ",
+            populate: {
+              path: "profile",
+
+              select: "user_id display_name",
+            },
+          })
+          .session(session);
+      });
+      const formatted = {
+        _id: user_id,
+        user: data[0]?.user_id,
+        roles: data.map((item: any) => ({
+          _id: item.role_id?._id,
+          name: item.role_id?.name,
+        })),
+        createdAt: data[0]?.createdAt,
+        updatedAt: data[0]?.updatedAt,
+      };
+
+      return res.status(201).json({
+        message: "Permissions created successfully",
+        data: formatted,
       });
     } catch (err: unknown) {
       return res.status(500).json({
@@ -839,30 +960,85 @@ class AdminController {
     }
   }
 
-  static async deletePermission(req: Request, res: Response) {
-    const id = req.params.id;
-    const session = await mongoose.startSession();
-
+  static async listUsersPermission(req: Request, res: Response) {
     try {
-      let deletedPermission;
-
-      await session.withTransaction(async () => {
-        const result = await HasRole.findById(id).session(session);
-        if (!result) {
-          throw new Error("Permission not found");
-        }
-
-        // ✅ ลบด้วย await
-        deletedPermission = await result.deleteOne({ session });
-      });
+      const data = await User.find(
+        {},
+        {
+          name: 1,
+          email: 1,
+        },
+      )
+        .populate({
+          path: "profile",
+          select: "user_id display_name",
+        })
+        .sort({
+          createdAt: -1,
+        });
 
       return res.status(200).json({
-        message: "Permission deleted successfully",
-        data: deletedPermission,
+        message: "success",
+        data,
       });
     } catch (err: unknown) {
       return res.status(500).json({
         message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
+  static async deletePermission(req: Request, res: Response) {
+    const user_id = req.params.id as string;
+    const session = await mongoose.startSession();
+
+    try {
+      // ✅ validate id
+      if (!mongoose.Types.ObjectId.isValid(user_id)) {
+        return res.status(400).json({
+          message: "Invalid user id",
+        });
+      }
+
+      let deletedPermissions;
+
+      await session.withTransaction(async () => {
+        // ✅ หา permissions ทั้งหมดของ user
+        const permissions = await HasRole.find({
+          user_id: new mongoose.Types.ObjectId(user_id),
+
+          deletedAt: null,
+        }).session(session);
+
+        if (permissions.length === 0) {
+          throw new Error("Permission not found");
+        }
+
+        // ✅ soft delete ทั้งหมด
+        deletedPermissions = await HasRole.updateMany(
+          {
+            user_id: new mongoose.Types.ObjectId(user_id),
+          },
+
+          {
+            $set: {
+              deletedAt: new Date(),
+            },
+          },
+
+          { session },
+        );
+      });
+
+      return res.status(200).json({
+        message: "Permissions deleted successfully",
+
+        data: deletedPermissions,
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+
         error: err instanceof Error ? err.message : "Unknown error",
       });
     } finally {
