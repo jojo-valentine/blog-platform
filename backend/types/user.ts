@@ -11,6 +11,7 @@ export interface IUser extends Document {
   verifyAt: Date;
   createdAt: Date;
   updatedAt: Date;
+  suspended: boolean;
   profile?: {
     avatar?: string;
     display_name?: string;

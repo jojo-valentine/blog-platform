@@ -112,14 +112,35 @@ router.get(
 );
 
 // pomision
-router.post("/permissions", AdminController.createPermission);
+router.post(
+  "/permissions",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.createPermission,
+);
 
-router.get("/permissions", AdminController.listPermissions);
+router.get(
+  "/permissions",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.listPermissions,
+);
 
-router.patch("/permissions/:id", AdminController.updatePermission);
+router.patch(
+  "/permissions/:id",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.updatePermission,
+);
 
-router.delete("/permissions/:id", AdminController.deletePermission);
-router.get("/list/user" ,AdminController.listUsersPermission);
+router.delete(
+  "/permissions/:id",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.deletePermission,
+);
+
+router.get("/list/user", AdminController.listUsersPermission);
 // user
 router.post("/users", AdminController.createUser);
 

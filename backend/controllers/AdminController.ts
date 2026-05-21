@@ -1,5 +1,13 @@
 import { Request, Response } from "express";
-import { Blog, HasRole, ImageBlog, ImageCategory, Role, User } from "../models";
+import {
+  Blog,
+  HasRole,
+  ImageBlog,
+  ImageCategory,
+  Profile,
+  Role,
+  User,
+} from "../models";
 import mongoose, { mongo, startSession } from "mongoose";
 import { error } from "node:console";
 
@@ -676,7 +684,6 @@ class AdminController {
         {
           $match: {
             ...preFilter,
-
             deletedAt: null,
           },
         },
@@ -819,32 +826,42 @@ class AdminController {
     const { roles, user_id } = req.body;
     const session = await mongoose.startSession();
 
-    // ✅ validate ก่อน transaction
-    if (!mongoose.Types.ObjectId.isValid(user_id)) {
-      return res.status(400).json({
-        message: "Validation error",
-        errors: [{ field: "user_id", message: "Invalid user id" }],
+    const errors: { field: string; message: string }[] = [];
+
+    // ✅ validate user id
+    if (!user_id || !mongoose.Types.ObjectId.isValid(user_id)) {
+      errors.push({
+        field: "user_id",
+        message: "Invalid user id",
       });
     }
 
+    // ✅ validate roles
     if (!Array.isArray(roles) || roles.length === 0) {
-      return res.status(400).json({
-        message: "Validation error",
-        errors: [{ field: "roles", message: "Roles required" }],
+      errors.push({
+        field: "roles",
+        message: "At least one role is required",
       });
+    } else {
+      const invalidRoles = roles.filter(
+        (role) => !mongoose.Types.ObjectId.isValid(role),
+      );
+
+      if (invalidRoles.length > 0) {
+        errors.push({
+          field: "roles",
+          message: "One or more role IDs are invalid",
+        });
+      }
     }
 
-    // ✅ validate role ids
-    const invalidRoles = roles.filter(
-      (r) => !mongoose.Types.ObjectId.isValid(r),
-    );
-    if (invalidRoles.length > 0) {
+    // ✅ return validation errors
+    if (errors.length > 0) {
       return res.status(400).json({
         message: "Validation error",
-        errors: [{ field: "roles", message: "Invalid role id" }],
+        errors,
       });
     }
-
     try {
       let data: any[] = [];
 
@@ -907,11 +924,45 @@ class AdminController {
   }
   static async updatePermission(req: Request, res: Response) {
     const { roles } = req.body;
-
-    const userId = req.params.id;
-
+    const userId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
     const session = await mongoose.startSession();
+    const errors: { field: string; message: string }[] = [];
+    // ✅ validate user id
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      errors.push({
+        field: "roles",
+        message: "Invalid user id",
+      });
+    }
 
+    // ✅ validate roles
+    if (!Array.isArray(roles) || roles.length === 0) {
+      errors.push({
+        field: "roles",
+        message: "At least one role is required",
+      });
+    } else {
+      const invalidRoles = roles.filter(
+        (role) => !mongoose.Types.ObjectId.isValid(role),
+      );
+
+      if (invalidRoles.length > 0) {
+        errors.push({
+          field: "roles",
+          message: "One or more role IDs are invalid",
+        });
+      }
+    }
+
+    // ✅ return validation errors
+    if (errors.length > 0) {
+      return res.status(400).json({
+        message: "Validation error",
+        errors,
+      });
+    }
     try {
       let data;
 
@@ -952,7 +1003,6 @@ class AdminController {
     } catch (err: unknown) {
       return res.status(500).json({
         message: "Server error",
-
         error: err instanceof Error ? err.message : "Unknown error",
       });
     } finally {
@@ -1047,7 +1097,80 @@ class AdminController {
   }
 
   static async createUser(req: Request, res: Response) {}
-  static async listUsers(req: Request, res: Response) {}
+  static async listUsers(req: Request, res: Response) {
+    try {
+      const page = Math.max(Number(req.query.page) || 1, 1);
+      const limit = Math.min(Number(req.query.limit) || 10, 50);
+      const skip = (page - 1) * limit;
+      const q = (req.query.search as string)?.trim();
+
+      // ✅ ดึง admin ids
+      const adminRole = await Role.findOne({ name: "admin" }).lean();
+      const adminUserIds = adminRole
+        ? (
+            await HasRole.find({
+              role_id: adminRole._id,
+
+              deletedAt: null,
+            }).distinct("user_id")
+          ).map((id) => new mongoose.Types.ObjectId(String(id)))
+        : [];
+
+      const filter: any = {
+        deletedAt: null,
+        _id: { $nin: adminUserIds },
+      };
+
+      // ✅ search
+      if (q) {
+        const matchedProfiles = await Profile.find({
+          deletedAt: null,
+          display_name: {
+            $regex: q,
+            $options: "i",
+          },
+        }).distinct("user_id");
+
+        filter.$or = [
+          { name: { $regex: q, $options: "i" } },
+          { email: { $regex: q, $options: "i" } },
+          { mobile: { $regex: q, $options: "i" } },
+          { _id: { $in: matchedProfiles } },
+          ...(mongoose.Types.ObjectId.isValid(q)
+            ? [{ _id: new mongoose.Types.ObjectId(q) }]
+            : []),
+        ];
+      }
+
+      const [users, total] = await Promise.all([
+        User.find(filter)
+          .select("name email mobile createdAt")
+          .populate({
+            path: "profile",
+            match: {
+              deletedAt: null,
+            },
+            select: "display_name age avatar social_links",
+          })
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(), // ✅ แก้ตรงนี้
+        User.countDocuments(filter),
+      ]);
+
+      return res.status(200).json({
+        message: "success users",
+        data: users,
+        meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
   static async getUserById(req: Request, res: Response) {}
   static async updateUser(req: Request, res: Response) {}
 }

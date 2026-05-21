@@ -285,7 +285,7 @@ export default function () {
         err.errors.forEach((e: { field: keyof Password; message: string }) => {
           fieldPasswordError[e.field].push(e.message);
         });
-        console.log(fieldPasswordError);
+        // console.log(fieldPasswordError);
         setPasswordError(fieldPasswordError);
       } else {
         setPasswordError({

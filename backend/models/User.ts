@@ -5,11 +5,6 @@ import { IUser } from "../types/user";
 
 const UserSchema = new Schema<IUser>(
   {
-    // _id: {
-    //   type: String,
-    //   default: () => uuidv4(),
-    // },
-
     name: {
       type: String,
       required: true,
@@ -24,11 +19,11 @@ const UserSchema = new Schema<IUser>(
     },
     mobile: { type: String, required: true, unique: true },
     verifyAt: { type: Date, default: null },
+    suspended: { type: Boolean, default: false },
     password: {
       type: String,
       required: true,
     },
-    // role: { type: String, default: "user" },
   },
   {
     timestamps: true, // auto createdAt, updatedAt

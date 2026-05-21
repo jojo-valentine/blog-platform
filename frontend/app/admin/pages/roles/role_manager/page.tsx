@@ -72,11 +72,15 @@ const initialFormCreate: formCreate = {
   roles: [],
 };
 export type formCreateError = {
-  user: any[];
-  roles: RoleItem[];
+  user_id: string;
+
+  roles: {
+    _id: string;
+    name: string;
+  }[];
 };
 const initialFormCreateError: formCreateError = {
-  user: [],
+  user_id: "",
   roles: [],
 };
 const initialFormError: permissionsError = {
@@ -235,21 +239,19 @@ export default function pageRoleManager() {
       );
 
       // ✅ update state
-      setPermissions((prev) =>
-        prev.map((item) =>
-          item._id === formEdit._id
-            ? {
-                ...item,
+      setPermissions((prev) => {
+        return [
+          {
+            ...prev.find((item) => item._id === formEdit._id)!,
+            roles: res.data.data.map((r: any) => ({
+              _id: r.role_id._id,
+              name: r.role_id.name,
+            })),
+          },
+          ...prev.filter((item) => item._id !== formEdit._id),
+        ];
+      });
 
-                roles: res.data.data.map((r: any) => ({
-                  _id: r.role_id._id,
-
-                  name: r.role_id.name,
-                })),
-              }
-            : item,
-        ),
-      );
       Swal.fire({
         title: "Updated 🎉",
         icon: "success",
@@ -275,20 +277,16 @@ export default function pageRoleManager() {
           },
         );
         setFormEditError(fieldErrors);
-        Swal.fire({
-          title: "Validation Error",
-          icon: "error",
-          text: "Please check your inputs",
-        });
 
         return;
+      } else {
+        // ✅ normal error
+        Swal.fire({
+          title: "Error",
+          icon: "error",
+          text: err?.message || error.message || "Update failed",
+        });
       }
-      // ✅ normal error
-      Swal.fire({
-        title: "Error",
-        icon: "error",
-        text: err?.message || error.message || "Update failed",
-      });
     } finally {
       setLoadingEdit(false);
     }
@@ -320,6 +318,7 @@ export default function pageRoleManager() {
   };
   const handleCreatePage = () => {
     setDialogCreate(true);
+    setFromCreateError(initialFormCreateError);
     setFormCreate((prev) => ({
       ...prev,
       users: usersPermission,
@@ -352,13 +351,15 @@ export default function pageRoleManager() {
         const exists = prev.some((p) => p._id === res.data.data._id);
 
         if (exists) {
-          return prev.map((p) =>
-            p._id === res.data.data._id ? res.data.data : p,
-          );
+          // ลบตัวเก่าออกก่อน
+          const filtered = prev.filter((p) => p._id !== res.data.data._id);
+          // แล้วเอาตัวใหม่มาใส่บนสุด
+          return [res.data.data, ...filtered];
         }
 
         return [res.data.data, ...prev];
       });
+      setDialogCreate(false);
     } catch (error: any) {
       const err = error.response?.data;
       // ✅ validation errors
@@ -379,25 +380,19 @@ export default function pageRoleManager() {
           },
         );
         setFromCreateError(fieldErrors);
-        Swal.fire({
-          title: "Validation Error",
-          icon: "error",
-          text: "Please check your inputs",
-        });
-
         return;
+      } else {
+        // ✅ normal error
+        Swal.fire({
+          title: "Error",
+          icon: "error",
+          text: err?.message || error.message || "Update failed",
+        });
       }
-      // ✅ normal error
-      Swal.fire({
-        title: "Error",
-        icon: "error",
-        text: err?.message || error.message || "Update failed",
-      });
     } finally {
       setLoadingCreate(false);
     }
   };
-
   const handleDeletePermission = async (id: string) => {
     const result = await Swal.fire({
       title: "Delete permission?",
@@ -757,8 +752,10 @@ export default function pageRoleManager() {
                   ))}
                 </select>
               </div>
-              {formCreateError.user && (
-                <p className="text-red-500 text-sm">{formCreateError.user}</p>
+              {formCreateError.user_id && (
+                <p className="text-red-500 text-sm">
+                  {formCreateError.user_id}
+                </p>
               )}
 
               {/* Roles */}
@@ -792,8 +789,17 @@ export default function pageRoleManager() {
                   })}
                 </div>
 
-                {formEditError.roles && (
-                  <p className="text-sm text-red-500">{formEditError.roles}</p>
+                {formCreateError.roles.length > 0 && (
+                  <div className="space-y-1">
+                    {formCreateError.roles.map((role, index) => (
+                      <p
+                        key={role._id || index}
+                        className="text-sm text-red-500"
+                      >
+                        {role.name}
+                      </p>
+                    ))}
+                  </div>
                 )}
               </div>
 
