@@ -1,11 +1,23 @@
 "use client";
 import { ContentLayout } from "@/app/components/admin/admin-panel/content-layout";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { API_URL } from "@/app/lib/config";
 import axios from "axios";
 import Swal from "sweetalert2";
 import { useAuth } from "@/app/context/AuthContext";
-import { Plus, SquarePen, Loader2, Ban, Trash2, RotateCcw } from "lucide-react";
+import {
+  Plus,
+  SquarePen,
+  Loader2,
+  Ban,
+  Trash2,
+  RotateCcw,
+  User,
+  Calendar,
+  Smartphone,
+  Mail,
+  Upload,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/app/components/admin/ui/skeleton";
 import { motion } from "framer-motion";
@@ -29,9 +41,75 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/app/components/admin/ui/avatar";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/admin/ui/card";
+import { CardDescription } from "@/app/components/ui/card";
+type ErrorsImage = {
+  avatar?: string;
+};
+type formEdit = {
+  _id: string;
+  name: string;
+  mobile: string;
+
+  profile: {
+    display_name?: string;
+    avatar?: string;
+    age?: string;
+    social_links?: {
+      platform?: string;
+      url?: string;
+    }[];
+  };
+};
+type formEditError = {
+  _id: string;
+  name: string;
+  mobile: string;
+
+  profile: {
+    display_name?: string;
+    avatar?: string;
+    age?: string;
+    social_links?: {
+      platform?: string;
+      url?: string;
+    }[];
+  };
+};
+const initialFormEdit: formEdit = {
+  _id: "",
+  name: "",
+  mobile: "",
+
+  profile: {
+    display_name: "",
+    avatar: "",
+    age: "",
+    social_links: [],
+  },
+};
+const initialFormEditError: formEditError = {
+  _id: "",
+  name: "",
+  mobile: "",
+
+  profile: {
+    display_name: "",
+    avatar: "",
+    age: "",
+    social_links: [],
+  },
+};
+
 export default function PageUser() {
   const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [dialogUserEdit, setDialogUserEdit] = useState(false);
   const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -40,6 +118,17 @@ export default function PageUser() {
   const [totalPages, setTotalPages] = useState(1);
   const [displayName, setDisplayName] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [formEdit, setFormEdit] = useState<formEdit>(initialFormEdit);
+  const [formEditLoading, setFormEditLoading] = useState(false);
+  const [formEditError, setFromEditError] =
+    useState<formEditError>(initialFormEditError);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [errorImage, setErrorImage] = useState<ErrorsImage>({});
+
+  // const [loadingAvatar ,setLoadingAvatar] = useState
+  // const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  // const [previewAvatar, setPreviewAvatar] = useState("");
   const fetchDataUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
@@ -52,9 +141,7 @@ export default function PageUser() {
         },
       });
       setUsers(res.data.data);
-      setDisplayName(
-        res.data.data?.name ?? res.data.data?.profile?.display_name ?? "",
-      );
+
       setTotalPages(res.data.meta.totalPages);
     } catch (error: any) {
       Swal.fire({
@@ -65,8 +152,239 @@ export default function PageUser() {
     } finally {
       setLoadingUsers(false);
     }
-  }, [, page, debouncedSearch]);
+  }, [page, debouncedSearch]);
 
+  const handleEdit = async (id: string) => {
+    setDialogUserEdit(true);
+
+    const data = users.find((u) => u._id === id);
+
+    if (!data) return;
+
+    setFormEdit({
+      _id: data._id,
+      name: data.name ?? "",
+      mobile: data.mobile ?? "",
+
+      profile: {
+        display_name: data.profile?.display_name ?? "",
+        avatar: data.profile?.avatar ?? "",
+        age: data.profile?.age ?? "",
+        social_links: data.profile?.social_links ?? [],
+      },
+    });
+  };
+
+  const handleAvatarUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    id: string,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !id) return;
+    if (uploadingAvatar) return; // กันกดรัว
+    setUploadingAvatar(true);
+    setErrorImage({});
+
+    // ✅ validate type
+    if (!file.type.startsWith("image/")) {
+      setErrorImage({ avatar: "Only image files allowed" });
+      setUploadingAvatar(false);
+      return;
+    }
+
+    // ✅ validate size
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorImage({ avatar: "Max 2MB allowed" });
+      setUploadingAvatar(false);
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const res = await axios.post(
+        `${API_URL}/api/admin/users/${id}/avatar`,
+        formData,
+        { withCredentials: true },
+      );
+      setFormEdit((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          avatar: res.data.avatarUrl,
+        },
+      }));
+      setUsers((prev) =>
+        prev.map((user) =>
+          user._id === id
+            ? {
+                ...user,
+                profile: {
+                  ...user.profile,
+                  avatar: res.data.avatarUrl,
+                },
+              }
+            : user,
+        ),
+      );
+
+      Swal.fire({
+        title: "success 🎉",
+        text: "Role has been create success.",
+        icon: "success",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      const err = error.response?.data;
+      if (Array.isArray(err?.errors)) {
+        const fieldErrorsImage: ErrorsImage = {};
+        err.errors.forEach(
+          (e: { field: keyof ErrorsImage; message: string }) => {
+            fieldErrorsImage[e.field] = e.message;
+          },
+        );
+
+        setErrorImage(fieldErrorsImage);
+      } else {
+        setErrorImage({
+          avatar: err?.message || "Upload failed",
+        });
+      }
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleChangeEdit = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    const { id, name, value } = e.target;
+
+    if (["display_name", "age"].includes(id)) {
+      setFormEdit((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          [id]: value,
+        },
+      }));
+    } else {
+      setFormEdit((prev) => ({
+        ...prev,
+        [id]: value,
+      }));
+    }
+    setFromEditError((prev) => ({
+      ...prev,
+      [id]: "",
+    }));
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormEditLoading(true);
+    setFromEditError(initialFormEditError);
+    try {
+      const res = await axios.patch(
+        `${API_URL}/api/admin/users/${formEdit._id}`,
+        formEdit,
+        { withCredentials: true },
+      );
+      setFormEdit((prev) => ({
+        ...prev,
+        mobile: res.data.data.mobile,
+        name: res.data.data.name,
+        profile: {
+          ...prev.profile, // เก็บ avatar ไว้
+          age: res.data.data.profile?.age ?? "",
+          display_name: res.data.data.profile?.display_name ?? "",
+          social_links: res.data.data.profile?.social_links ?? [],
+        },
+      }));
+
+      setUsers((prev) =>
+        prev.map((user) =>
+          user._id === formEdit._id
+            ? {
+                ...user,
+                mobile: res.data.data.mobile,
+                name: res.data.data.name,
+                profile: {
+                  ...user.profile,
+                  age: res.data.data.profile?.age ?? "",
+                  display_name: res.data.data.profile?.display_name ?? "",
+                  social_links: res.data.data.profile?.social_links ?? [],
+                  avatar: user.profile ? (user.profile.avatar ?? "") : "", // เก็บ avatar เดิมไว้
+                },
+              }
+            : user,
+        ),
+      );
+
+      Swal.fire({
+        title: "Success",
+        text: "User updated successfully",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+
+        customClass: {
+          container: "z-[999999]",
+        },
+      });
+    } catch (error: any) {
+      const err = error.response?.data;
+
+      if (Array.isArray(err?.errors)) {
+        const fieldErrorsProfile = structuredClone(initialFormEditError);
+        err.errors.forEach(
+          (e: { field: keyof formEditError; message: string }) => {
+            if (e.field.startsWith("social_links")) {
+              const [, indexStr, key] = e.field.split(".");
+              const index = Number(indexStr);
+              if (isNaN(index)) return;
+              // ✅ เช็ค undefined ก่อน
+              if (!fieldErrorsProfile.profile) {
+                fieldErrorsProfile.profile = { social_links: [] };
+              }
+
+              if (!fieldErrorsProfile.profile.social_links) {
+                fieldErrorsProfile.profile.social_links = [];
+              }
+
+              if (!fieldErrorsProfile.profile.social_links[index]) {
+                fieldErrorsProfile.profile.social_links[index] = {};
+              }
+
+              (fieldErrorsProfile.profile.social_links[index] as any)[key] =
+                e.message;
+            } else if (
+              e.field.startsWith("display_name") ||
+              e.field.startsWith("age")
+            ) {
+              fieldErrorsProfile.profile ??= {};
+              (fieldErrorsProfile.profile as any)[e.field] = e.message;
+            } else {
+              fieldErrorsProfile[e.field] = e.message;
+            }
+          },
+        );
+        setFromEditError(fieldErrorsProfile);
+      } else {
+        Swal.fire({
+          title: "Error",
+          icon: "error",
+          timer: 1500,
+          showConfirmButton: false,
+          text: err?.message || "Something went wrong",
+        });
+      }
+    } finally {
+      setFormEditLoading(false);
+    }
+  };
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -79,6 +397,30 @@ export default function PageUser() {
       fetchDataUsers();
     }
   }, [user, fetchDataUsers, page, debouncedSearch]);
+
+  const getAvatarSrc = (avatar?: string) => {
+    if (!avatar) return "/default/fallback/default-placeholder.png";
+    if (avatar.startsWith("http")) return avatar;
+    // ✅ เติม / ถ้าไม่มี
+    const path = avatar.startsWith("/") ? avatar : `/${avatar}`;
+    console.log({ avatar: `${API_URL}${path}` });
+    return `${API_URL}${path}`;
+  };
+
+  const addSocialLink = (
+    setFormEdit: React.Dispatch<React.SetStateAction<typeof formEdit>>,
+  ) => {
+    setFormEdit((prev) => ({
+      ...prev,
+      profile: {
+        ...prev.profile,
+        social_links: [
+          ...(prev.profile.social_links ?? []), // fallback เป็น [] เสมอ
+          { platform: "", url: "" },
+        ],
+      },
+    }));
+  };
   return (
     <ContentLayout title="pageUser">
       {loading ? (
@@ -169,11 +511,7 @@ export default function PageUser() {
                             >
                               {u?.profile?.avatar ? (
                                 <AvatarImage
-                                  src={
-                                    u.profile.avatar.startsWith("http")
-                                      ? u.profile.avatar
-                                      : `${API_URL}${u.profile.avatar}`
-                                  }
+                                  src={getAvatarSrc(u?.profile?.avatar)}
                                   onError={(e) => {
                                     e.currentTarget.src =
                                       "/default/fallback/default-placeholder.png";
@@ -279,6 +617,8 @@ export default function PageUser() {
                               size="icon"
                               variant="outline"
                               className="hover:bg-muted"
+                              onClick={() => handleEdit(u._id)}
+                              type="button"
                             >
                               <SquarePen className="h-4 w-4" />
                             </Button>
@@ -374,6 +714,347 @@ export default function PageUser() {
           >
             ✕
           </button>
+        </motion.div>
+      )}
+      {dialogUserEdit && (
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full"
+        >
+          {dialogUserEdit && (
+            <Dialog open={dialogUserEdit} onOpenChange={setDialogUserEdit}>
+              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <DialogHeader className="space-y-2">
+                    <DialogTitle className="text-xl">
+                      Edit User Profile
+                    </DialogTitle>
+
+                    <DialogDescription>
+                      Update user profile information and social links.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <form onSubmit={handleEditSubmit} className="mt-6 space-y-8">
+                    {/* Avatar */}
+                    <div className="flex flex-col items-center gap-6 rounded-2xl border bg-muted/20 p-6 md:flex-row">
+                      <Avatar className="h-28 w-28 border-4 border-background shadow-xl">
+                        {formEdit.profile.avatar ? (
+                          <AvatarImage
+                            src={
+                              formEdit.profile.avatar?.startsWith("http")
+                                ? formEdit.profile.avatar
+                                : `${API_URL}${formEdit.profile.avatar}`
+                            }
+                            onError={(e) => {
+                              e.currentTarget.src =
+                                "/default/fallback/default-placeholder.png";
+                            }}
+                          />
+                        ) : null}
+
+                        <AvatarFallback className="bg-primary text-3xl font-bold text-primary-foreground">
+                          {(displayName || formEdit.name || "U")
+                            .charAt(0)
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="space-y-3">
+                        <div>
+                          <h3 className="font-semibold">Profile Avatar</h3>
+
+                          <p className="text-sm text-muted-foreground">
+                            Upload avatar image for this user
+                          </p>
+                        </div>
+
+                        <label
+                          htmlFor="avatar-upload"
+                          className=" inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-muted"
+                        >
+                          {uploadingAvatar ? (
+                            <div className="flex items-center gap-2">
+                              {" "}
+                              <Loader2 className="h-4 w-4 animate-spin" />{" "}
+                              <span> uploading</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Upload className="h-4 w-4" />
+                              <span>Upload Avatar</span>
+                            </div>
+                          )}
+                        </label>
+
+                        <input
+                          id="avatar-upload"
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={(e) => {
+                            handleAvatarUpload(e, formEdit._id);
+                          }}
+                          disabled={uploadingAvatar}
+                        />
+
+                        <p className="text-xs text-muted-foreground">
+                          PNG, JPG up to 5MB
+                        </p>
+                      </div>
+                      {errorImage.avatar && (
+                        <div className="mt-2 flex items-center gap-2 text-sm text-red-600 animate-pulse">
+                          <span>⚠️</span>
+                          <p>{errorImage.avatar}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* User Info */}
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                      {/* Name */}
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Name</Label>
+
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                          <Input
+                            id="name"
+                            value={formEdit.name}
+                            placeholder="Enter your name"
+                            className={`pl-10 ${
+                              formEditError.name
+                                ? "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                                : ""
+                            }`}
+                            onChange={handleChangeEdit}
+                          />
+                          {formEditError.name && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-red-600 animate-pulse">
+                              <span>⚠️</span>
+                              <p>{formEditError.name}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Display Name */}
+                      <div className="space-y-2">
+                        <Label htmlFor="display_name">Display Name</Label>
+
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                          <Input
+                            id="display_name"
+                            value={formEdit.profile.display_name}
+                            placeholder="Display name"
+                            className={`pl-10 ${
+                              formEditError.profile.display_name
+                                ? "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                                : ""
+                            }`}
+                            onChange={handleChangeEdit}
+                          />
+                          {formEditError.profile.display_name && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-red-600 animate-pulse">
+                              <span>⚠️</span>
+                              <p>{formEditError.profile.display_name}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Age */}
+                      <div className="space-y-2">
+                        <Label htmlFor="age">Age</Label>
+
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                          <Input
+                            id="age"
+                            type="number"
+                            value={formEdit.profile.age}
+                            placeholder="Age"
+                            className={`pl-10 ${
+                              formEditError.profile.age
+                                ? "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                                : ""
+                            }`}
+                            onChange={handleChangeEdit}
+                          />
+                          {formEditError.profile.age && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-red-600 animate-pulse">
+                              <span>⚠️</span>
+                              <p>{formEditError.profile.age}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Mobile */}
+                      <div className="space-y-2">
+                        <Label htmlFor="mobile">Mobile</Label>
+
+                        <div className="relative">
+                          <Smartphone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                          <Input
+                            id="mobile"
+                            value={formEdit.mobile}
+                            placeholder="Mobile"
+                            className={`pl-10 ${
+                              formEditError.mobile
+                                ? "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                                : ""
+                            }`}
+                            onChange={handleChangeEdit}
+                          />
+                          {formEditError.mobile && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-red-600 animate-pulse">
+                              <span>⚠️</span>
+                              <p>{formEditError.mobile}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Social Links */}
+                    <div className="space-y-4 rounded-2xl border bg-muted/20 p-5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold">Social Links</h3>
+
+                          <p className="text-sm text-muted-foreground">
+                            Add social accounts
+                          </p>
+                        </div>
+                        {(formEdit?.profile?.social_links?.length ?? 0) < 5 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => addSocialLink(setFormEdit)}
+                          >
+                            + Add Link
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        {formEdit.profile.social_links?.map((link, index) => (
+                          <div
+                            key={index}
+                            className=" flex flex-col gap-3 rounded-xl border bg-background p-4 md:flex-row "
+                          >
+                            <select
+                              value={link.platform}
+                              className=" rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                              onChange={(e) => {
+                                const newLinks = [
+                                  ...(formEdit?.profile?.social_links ?? []),
+                                ];
+                                newLinks[index].platform = e.target.value;
+                                // setSocial_links(newLinks);
+                                setFormEdit((prev) => ({
+                                  ...prev,
+                                  profile: {
+                                    ...prev.profile,
+                                    social_links: newLinks,
+                                  },
+                                }));
+                              }}
+                            >
+                              <option value="">Select Platform</option>
+
+                              <option value="youtube">YouTube</option>
+
+                              <option value="instagram">Instagram</option>
+
+                              <option value="facebook">Facebook</option>
+
+                              <option value="other">Other</option>
+                            </select>
+
+                            <Input
+                              type="text"
+                              value={link.url}
+                              placeholder="https://..."
+                              // className="flex-1"
+                              className={`pl-10 ${formEdit.profile.social_links?.[index]?.url && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"} basis-8/12 border p-2 rounded`}
+                              onChange={(e) => {
+                                const newLinks = [
+                                  ...(formEdit?.profile?.social_links ?? []),
+                                ];
+                                newLinks[index].url = e.target.value;
+                                setFormEdit((prev) => ({
+                                  ...prev,
+                                  profile: {
+                                    ...prev.profile,
+                                    social_links: newLinks,
+                                  },
+                                }));
+                              }}
+                            />
+
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              onClick={() => {
+                                setFormEdit((prev) => ({
+                                  ...prev,
+                                  profile: {
+                                    ...prev.profile,
+                                    social_links:
+                                      prev.profile?.social_links?.filter(
+                                        (_, i) => i !== index,
+                                      ),
+                                  },
+                                }));
+                              }}
+                            >
+                              ลบ
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex justify-end gap-3 border-t pt-6">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setDialogUserEdit(false)}
+                      >
+                        Cancel
+                      </Button>
+
+                      <Button type="submit" disabled={formEditLoading}>
+                        {formEditLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <p> Save Changes</p>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </motion.div>
+              </DialogContent>
+            </Dialog>
+          )}
         </motion.div>
       )}
     </ContentLayout>

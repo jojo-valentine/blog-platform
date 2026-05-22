@@ -10,6 +10,8 @@ import {
 } from "../models";
 import mongoose, { mongo, startSession } from "mongoose";
 import { error } from "node:console";
+import path from "path";
+const fs = require("fs");
 
 class AdminController {
   static async listBlog(req: Request, res: Response) {
@@ -1172,6 +1174,160 @@ class AdminController {
     }
   }
   static async getUserById(req: Request, res: Response) {}
-  static async updateUser(req: Request, res: Response) {}
+
+  static async uploadAvatarByAdmin(req: Request, res: Response) {
+    const targetUserId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id; // ✅ ใช้ id จาก params
+
+    // ✅ validate id
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+
+    const file = req.file as Express.Multer.File;
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const session = await mongoose.startSession();
+    let oldAvatar = "";
+
+    try {
+      let profileData: any;
+
+      await session.withTransaction(async () => {
+        const profile = await Profile.findOne({
+          user_id: targetUserId, // ✅ ใช้ targetUserId แทน req.user?.userId
+        }).session(session);
+
+        if (!profile) throw new Error("Profile not found");
+
+        oldAvatar = profile.avatar || "";
+        profile.avatar = file.path;
+        await profile.save({ session });
+        profileData = profile;
+      });
+
+      // ลบรูปเก่า
+      if (oldAvatar) {
+        const absolute = path.resolve(process.cwd(), "." + oldAvatar);
+        try {
+          if (fs.existsSync(absolute) && fs.lstatSync(absolute).isFile()) {
+            await fs.promises.unlink(absolute);
+          }
+        } catch (err) {
+          console.error("Delete old avatar error:", err);
+        }
+      }
+
+      return res.status(200).json({
+        avatarUrl: profileData?.avatar,
+        message: "update avatar successfully",
+      });
+    } catch (error: unknown) {
+      // ลบไฟล์ใหม่ถ้า error
+      try {
+        if (file?.path) {
+          const absolute = path.resolve(file.path);
+          if (fs.existsSync(absolute)) await fs.promises.unlink(absolute);
+        }
+      } catch {}
+
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Server error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  static async updateUser(req: Request, res: Response) {
+    const session = await mongoose.startSession();
+
+    try {
+      const idParam = Array.isArray(req.params.id)
+        ? req.params.id[0]
+        : req.params.id;
+      const { name, mobile, profile } = req.body;
+
+      // ✅ validate id
+      if (!mongoose.Types.ObjectId.isValid(idParam)) {
+        return res.status(400).json({ message: "Invalid user id" });
+      }
+
+      let result: any = null;
+
+      await session.withTransaction(async () => {
+        // ✅ หา user
+        const user = await User.findById(idParam).session(session);
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        // ✅ หา profile
+        let profileUser = await Profile.findOne({ user_id: idParam }).session(
+          session,
+        );
+
+        // ✅ create profile ถ้ายังไม่มี
+        if (!profileUser) {
+          profileUser = await Profile.create(
+            [{ user_id: idParam, display_name: user.name }],
+            {
+              session,
+            },
+          ).then((res) => res[0]);
+        }
+
+        // ✅ update user
+        await User.updateOne(
+          { _id: idParam },
+          { $set: { name, mobile } },
+          { session },
+        );
+
+        // ✅ update profile
+        const updatedProfile = await Profile.findOneAndUpdate(
+          { user_id: idParam },
+          {
+            $set: {
+              display_name: profile?.display_name ?? profileUser?.display_name,
+              age: profile?.age ?? profileUser?.age,
+              avatar: profile?.avatar ?? "",
+              social_links:
+                profile?.social_links ?? profileUser?.social_links ?? [],
+            },
+          },
+          { new: true, session },
+        );
+
+        result = {
+          _id: user._id,
+          name,
+          mobile,
+          profile: {
+            display_name: updatedProfile?.display_name,
+            age: updatedProfile?.age,
+            avatar: updatedProfile?.avatar,
+            social_links: updatedProfile?.social_links,
+          },
+        };
+      });
+
+      // ✅ return success
+      return res.status(200).json({
+        message: "Update successfully",
+        data: result,
+      });
+    } catch (error: unknown) {
+      console.error("🔥 updateUser ERROR =>", error);
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Server error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
 }
 export default AdminController;

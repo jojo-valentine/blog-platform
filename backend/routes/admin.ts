@@ -5,6 +5,7 @@ import { authMiddleware } from "../middleware/authMiddleware";
 import { useValidation } from "../middleware/useValidation";
 import { categorySchemas } from "../validations/categoryValidation";
 import { adminSchemas } from "../validations/adminValidation";
+import { uploadAvatar } from "../middleware/uploadMiddleware";
 
 const router = Router();
 
@@ -142,6 +143,13 @@ router.delete(
 
 router.get("/list/user", AdminController.listUsersPermission);
 // user
+router.post(
+  "/users/:id/avatar", // ✅ ระบุ user id ใน params
+  authMiddleware,
+
+  uploadAvatar,
+  AdminController.uploadAvatarByAdmin,
+);
 router.post("/users", AdminController.createUser);
 
 router.get("/users", AdminController.listUsers);
