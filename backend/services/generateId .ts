@@ -8,4 +8,11 @@ export const generateBlogId = (
   (req as any).blogId = new mongoose.Types.ObjectId();
   next();
 };
-  
+export const generateUserId = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  (req as any).userId = new mongoose.Types.ObjectId();
+  next();
+};

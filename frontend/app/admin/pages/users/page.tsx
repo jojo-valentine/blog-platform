@@ -16,6 +16,9 @@ import {
   Calendar,
   Smartphone,
   Mail,
+  EyeOff,
+  Eye,
+  Lock,
   Upload,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -105,7 +108,66 @@ const initialFormEditError: formEditError = {
     social_links: [],
   },
 };
+type formCreate = {
+  name: string;
+  mobile: string;
+  email: string;
+  password: string;
+  confirm_password: string;
+  profile: {
+    display_name?: string;
+    avatar?: string;
+    age?: string;
+    social_links?: {
+      platform?: string;
+      url?: string;
+    }[];
+  };
+};
+type formCreateError = {
+  name: string;
+  mobile: string;
+  email: string;
+  password: string;
+  confirm_password: string;
+  profile: {
+    display_name?: string;
+    avatar?: string;
+    age?: string;
+    social_links?: SocialLinkError[];
+  };
+};
+export type SocialLinkError = {
+  platform?: string;
+  url?: string;
+};
 
+const initialFormCreate: formCreate = {
+  name: "",
+  mobile: "",
+  email: "",
+  password: "",
+  confirm_password: "",
+  profile: {
+    display_name: "",
+    avatar: "",
+    age: "",
+    social_links: [],
+  },
+};
+const initialFormCreateError: formCreateError = {
+  name: "",
+  mobile: "",
+  email: "",
+  password: "",
+  confirm_password: "",
+  profile: {
+    display_name: "",
+    avatar: "",
+    age: "",
+    social_links: [],
+  },
+};
 export default function PageUser() {
   const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -125,10 +187,17 @@ export default function PageUser() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [errorImage, setErrorImage] = useState<ErrorsImage>({});
-
+  const [dialogUserCreate, setDialogUserCreate] = useState(false);
+  const [formCreate, setFormCreate] = useState<formCreate>(initialFormCreate);
+  const [formCreateLoading, setFormCreateLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [formCreateError, setFromCreateError] = useState<formCreateError>(
+    initialFormCreateError,
+  );
   // const [loadingAvatar ,setLoadingAvatar] = useState
-  // const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  // const [previewAvatar, setPreviewAvatar] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [previewAvatar, setPreviewAvatar] = useState("");
   const fetchDataUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
@@ -153,7 +222,6 @@ export default function PageUser() {
       setLoadingUsers(false);
     }
   }, [page, debouncedSearch]);
-
   const handleEdit = async (id: string) => {
     setDialogUserEdit(true);
 
@@ -174,7 +242,6 @@ export default function PageUser() {
       },
     });
   };
-
   const handleAvatarUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     id: string,
@@ -385,6 +452,35 @@ export default function PageUser() {
       setFormEditLoading(false);
     }
   };
+  const handleCreate = async () => {
+    setDialogUserCreate(true);
+    setFromCreateError(initialFormCreateError);
+  };
+
+  const handleChangeCreate = async (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    const { id, name, value } = e.target;
+    if (["display_name", "age"].includes(id)) {
+      setFormCreate((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          [id]: value,
+        },
+      }));
+    } else {
+      setFormCreate((prev) => ({
+        ...prev,
+        [id]: value,
+      }));
+    }
+
+    setFromCreateError((prev) => ({
+      ...prev,
+      [id]: "",
+    }));
+  };
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -403,8 +499,21 @@ export default function PageUser() {
     if (avatar.startsWith("http")) return avatar;
     // ✅ เติม / ถ้าไม่มี
     const path = avatar.startsWith("/") ? avatar : `/${avatar}`;
-    console.log({ avatar: `${API_URL}${path}` });
+    // console.log({ avatar: `${API_URL}${path}` });
     return `${API_URL}${path}`;
+  };
+
+  const handleAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // ✅ เก็บไฟล์ไว้ใน state
+    setAvatarFile(file);
+
+    // ✅ สร้าง URL สำหรับ preview
+    const previewUrl = URL.createObjectURL(file);
+    setPreviewAvatar(previewUrl);
   };
 
   const addSocialLink = (
@@ -420,6 +529,136 @@ export default function PageUser() {
         ],
       },
     }));
+  };
+
+  const addSocialLinkCreate = (
+    setFormCreate: React.Dispatch<React.SetStateAction<typeof formCreate>>,
+  ) => {
+    setFormCreate((prev) => ({
+      ...prev,
+      profile: {
+        ...prev.profile,
+        social_links: [
+          ...(prev.profile.social_links ?? []),
+          { platform: "", url: "" },
+        ],
+      },
+    }));
+  };
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setFormCreateLoading(true);
+
+    try {
+      const formData = new FormData();
+
+      if (avatarFile) {
+        formData.append("avatar", avatarFile);
+      }
+
+      // basic
+      formData.append("name", formCreate.name);
+      formData.append("email", formCreate.email);
+      formData.append("mobile", formCreate.mobile);
+
+      // password check
+      if (formCreate.password !== formCreate.confirm_password) {
+        setFromCreateError((prev) => ({
+          ...prev,
+          password: "Password not match",
+          confirm_password: "Password not match",
+        }));
+
+        return;
+      }
+
+      formData.append("password", formCreate.password);
+      formData.append("confirm_password", formCreate.confirm_password);
+
+      // profile
+      formData.append(
+        "display_name",
+        formCreate.profile.display_name || formCreate.name,
+      );
+
+      formData.append("age", formCreate.profile.age || "");
+
+      formData.append(
+        "social_links",
+        JSON.stringify(formCreate.profile.social_links || []),
+      );
+
+      const res = await axios.post(`${API_URL}/api/admin/users`, formData, {
+        withCredentials: true,
+      });
+
+      // ✅ ปิด dialog ก่อน
+      setDialogUserCreate(false);
+
+      // ✅ reset form
+      setFormCreate(initialFormCreate);
+      setPreviewAvatar("");
+      setAvatarFile(null);
+
+      // ✅ delay นิดนึงให้ dialog unmount
+      // setTimeout(() => {
+      //   Swal.fire({
+      //     icon: "success",
+      //     title: "Success",
+      //     text: res.data.message,
+      //     timer: 500,
+      //     showConfirmButton: false,
+      //   });
+      // }, 150);
+    } catch (error: any) {
+      const err = error.response?.data;
+
+      if (Array.isArray(err?.errors)) {
+        const fieldErrors = structuredClone(initialFormCreateError);
+
+        err.errors.forEach((e: any) => {
+          if (e.field.startsWith("social_links")) {
+            const [, indexStr, key] = e.field.split(".");
+            const index = Number(indexStr);
+
+            if (!(fieldErrors.profile.social_links ?? [])[index]) {
+              (fieldErrors.profile.social_links ?? [])[index] = {};
+            }
+
+            ((fieldErrors.profile.social_links ?? [])[index] as any)[key] =
+              e.message;
+
+            return;
+          }
+
+          if (
+            e.field === "display_name" ||
+            e.field === "age" ||
+            e.field === "avatar"
+          ) {
+            (fieldErrors.profile as any)[e.field] = e.message;
+
+            return;
+          }
+
+          (fieldErrors as any)[e.field] = e.message;
+        });
+
+        setFromCreateError(fieldErrors);
+      } else {
+        setTimeout(() => {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: error.response?.data?.message || "Something went wrong",
+          });
+        }, 100);
+      }
+    } finally {
+      setFormCreateLoading(false);
+    }
   };
   return (
     <ContentLayout title="pageUser">
@@ -466,7 +705,7 @@ export default function PageUser() {
                     variant="outline"
                     type="button"
                     className="h-11 rounded-xl bg-green-500 px-5 text-white transition hover:bg-green-600"
-                    // onClick={handleCreatePage}
+                    onClick={handleCreate}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Role
@@ -765,7 +1004,6 @@ export default function PageUser() {
                             .toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-
                       <div className="space-y-3">
                         <div>
                           <h3 className="font-semibold">Profile Avatar</h3>
@@ -990,7 +1228,12 @@ export default function PageUser() {
                               value={link.url}
                               placeholder="https://..."
                               // className="flex-1"
-                              className={`pl-10 ${formEdit.profile.social_links?.[index]?.url && "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"} basis-8/12 border p-2 rounded`}
+                              className={`pl-10 ${
+                                formEditError.profile?.social_links?.[index]
+                                  ?.url
+                                  ? "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                                  : ""
+                              } basis-8/12 border p-2 rounded`}
                               onChange={(e) => {
                                 const newLinks = [
                                   ...(formEdit?.profile?.social_links ?? []),
@@ -1056,6 +1299,483 @@ export default function PageUser() {
             </Dialog>
           )}
         </motion.div>
+      )}
+
+      {dialogUserCreate && (
+        <Dialog
+          open={dialogUserCreate}
+          onOpenChange={(open) => {
+            setDialogUserCreate(open);
+
+            if (!open) {
+              setPreviewAvatar("");
+              setAvatarFile(null);
+
+              setFormCreate(initialFormCreate);
+              setFromCreateError(initialFormCreateError);
+            }
+          }}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="w-full"
+            >
+              <DialogHeader className="space-y-2">
+                <DialogTitle className="text-2xl font-bold">
+                  Create User Profile
+                </DialogTitle>
+
+                <DialogDescription>
+                  Create user profile information and social links
+                </DialogDescription>
+              </DialogHeader>
+
+              <form onSubmit={handleCreateSubmit} className="mt-6 space-y-8">
+                {/* Avatar */}
+                <div className="flex flex-col items-center gap-6 rounded-2xl border bg-muted/20 p-6 md:flex-row">
+                  <Avatar className="h-28 w-28 border-4 border-background shadow-xl">
+                    {previewAvatar ? (
+                      <AvatarImage
+                        src={previewAvatar}
+                        onError={(e) => {
+                          e.currentTarget.src =
+                            "/default/fallback/default-placeholder.png";
+                        }}
+                      />
+                    ) : null}
+
+                    <AvatarFallback className="bg-primary text-3xl font-bold text-primary-foreground">
+                      {(
+                        formCreate.profile.display_name ||
+                        formCreate.name ||
+                        "U"
+                      )
+                        .charAt(0)
+                        .toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="font-semibold">Profile Avatar</h3>
+
+                      <p className="text-sm text-muted-foreground">
+                        Upload avatar image for this user
+                      </p>
+                    </div>
+
+                    <label
+                      htmlFor="avatar-upload-create"
+                      className="
+                  inline-flex cursor-pointer items-center gap-2
+                  rounded-lg border border-border
+                  bg-background px-4 py-2 text-sm
+                  font-medium shadow-sm transition
+                  hover:bg-muted
+                "
+                    >
+                      {uploadingAvatar ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4" />
+                          <span>Upload Avatar</span>
+                        </>
+                      )}
+                    </label>
+
+                    <input
+                      id="avatar-upload-create"
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={handleAvatar}
+                    />
+
+                    <p className="text-xs text-muted-foreground">
+                      PNG, JPG up to 5MB
+                    </p>
+
+                    {formCreateError.profile.avatar && (
+                      <div className="flex items-center gap-2 text-sm text-red-600">
+                        <span>⚠️</span>
+                        <p>{formCreateError.profile.avatar}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* User Info */}
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  {/* Name */}
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name</Label>
+
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                      <Input
+                        id="name"
+                        value={formCreate.name}
+                        placeholder="Enter your name"
+                        className={`pl-10 ${
+                          formCreateError.name
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                        onChange={handleChangeCreate}
+                      />
+                    </div>
+
+                    {formCreateError.name && (
+                      <p className="text-sm text-red-500">
+                        {formCreateError.name}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Display Name */}
+                  <div className="space-y-2">
+                    <Label htmlFor="display_name">Display Name</Label>
+
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                      <Input
+                        id="display_name"
+                        value={formCreate.profile.display_name}
+                        placeholder="Display name"
+                        className={`pl-10 ${
+                          formCreateError.profile.display_name
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                        onChange={handleChangeCreate}
+                      />
+                    </div>
+
+                    {formCreateError.profile.display_name && (
+                      <p className="text-sm text-red-500">
+                        {formCreateError.profile.display_name}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Email */}
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formCreate.email}
+                        placeholder="Email"
+                        className={`pl-10 ${
+                          formCreateError.email
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                        onChange={handleChangeCreate}
+                      />
+                    </div>
+
+                    {formCreateError.email && (
+                      <p className="text-sm text-red-500">
+                        {formCreateError.email}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Age */}
+                  <div className="space-y-2">
+                    <Label htmlFor="age">Age</Label>
+
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                      <Input
+                        id="age"
+                        type="number"
+                        value={formCreate.profile.age}
+                        placeholder="Age"
+                        className={`pl-10 ${
+                          formCreateError.profile.age
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                        onChange={handleChangeCreate}
+                      />
+                    </div>
+
+                    {formCreateError.profile.age && (
+                      <p className="text-sm text-red-500">
+                        {formCreateError.profile.age}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Mobile */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="mobile">Mobile</Label>
+
+                    <div className="relative">
+                      <Smartphone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                      <Input
+                        id="mobile"
+                        value={formCreate.mobile}
+                        placeholder="Mobile"
+                        className={`pl-10 ${
+                          formCreateError.mobile
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                        onChange={handleChangeCreate}
+                      />
+                    </div>
+
+                    {formCreateError.mobile && (
+                      <p className="text-sm text-red-500">
+                        {formCreateError.mobile}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Social Links */}
+                <div className="space-y-4 rounded-2xl border bg-muted/20 p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold">Social Links</h3>
+
+                      <p className="text-sm text-muted-foreground">
+                        Add social accounts
+                      </p>
+                    </div>
+
+                    {(formCreate.profile.social_links?.length ?? 0) < 5 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addSocialLinkCreate(setFormCreate)}
+                      >
+                        + Add Link
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    {formCreate.profile.social_links?.map((link, index) => (
+                      <div
+                        key={index}
+                        className="
+                      flex flex-col gap-3 rounded-xl border
+                      bg-background p-4 md:flex-row
+                    "
+                      >
+                        <select
+                          value={link.platform}
+                          className="
+                        rounded-lg border border-border
+                        bg-background px-3 py-2 text-sm
+                      "
+                          onChange={(e) => {
+                            const newLinks = [
+                              ...(formCreate.profile.social_links ?? []),
+                            ];
+
+                            newLinks[index].platform = e.target.value;
+
+                            setFormCreate((prev) => ({
+                              ...prev,
+                              profile: {
+                                ...prev.profile,
+                                social_links: newLinks,
+                              },
+                            }));
+                          }}
+                        >
+                          <option value="">Select Platform</option>
+
+                          <option value="youtube">YouTube</option>
+
+                          <option value="instagram">Instagram</option>
+
+                          <option value="facebook">Facebook</option>
+
+                          <option value="other">Other</option>
+                        </select>
+
+                        <Input
+                          type="text"
+                          value={link.url}
+                          placeholder="https://..."
+                          className={`flex-1 ${
+                            formCreateError.profile?.social_links?.[index]?.url
+                              ? "border-red-500 ring-1 ring-red-500"
+                              : ""
+                          }`}
+                          onChange={(e) => {
+                            const newLinks = [
+                              ...(formCreate.profile.social_links ?? []),
+                            ];
+
+                            newLinks[index].url = e.target.value;
+
+                            setFormCreate((prev) => ({
+                              ...prev,
+                              profile: {
+                                ...prev.profile,
+                                social_links: newLinks,
+                              },
+                            }));
+                          }}
+                        />
+                        {formCreateError.profile.social_links?.[index]?.url && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {formCreateError.profile.social_links[index]?.url}
+                          </p>
+                        )}
+
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => {
+                            setFormCreate((prev) => ({
+                              ...prev,
+                              profile: {
+                                ...prev.profile,
+                                social_links: (
+                                  prev.profile.social_links ?? []
+                                ).filter((_, i) => i !== index),
+                              },
+                            }));
+                          }}
+                        >
+                          ลบ
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={formCreate.password}
+                        placeholder="Password"
+                        className={`pl-10 ${
+                          formCreateError.password
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                        onChange={handleChangeCreate}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {formCreateError.password && (
+                      <p className="text-sm text-red-500">
+                        {formCreateError.password}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm_password">Confirm Password</Label>
+
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                      <Input
+                        id="confirm_password"
+                        type={showPasswordConfirm ? "text" : "password"}
+                        value={formCreate.confirm_password}
+                        placeholder="Confirm Password"
+                        className={`pl-10 ${
+                          formCreateError.confirm_password
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                        onChange={handleChangeCreate}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowPasswordConfirm(!showPasswordConfirm)
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                      >
+                        {showPasswordConfirm ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  {formCreateError.confirm_password && (
+                    <p className="text-sm text-red-500">
+                      {formCreateError.confirm_password}
+                    </p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-3 border-t pt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogUserCreate(false)}
+                  >
+                    Cancel
+                  </Button>
+
+                  <Button type="submit" disabled={formCreateLoading}>
+                    {formCreateLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        creating...
+                      </>
+                    ) : (
+                      "Create"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
+          </DialogContent>
+        </Dialog>
       )}
     </ContentLayout>
   );

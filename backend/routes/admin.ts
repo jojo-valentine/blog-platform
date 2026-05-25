@@ -4,9 +4,14 @@ import { requirePermission, requireRole } from "../middleware/roleMiddleware";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { useValidation } from "../middleware/useValidation";
 import { categorySchemas } from "../validations/categoryValidation";
-import { adminSchemas } from "../validations/adminValidation";
-import { uploadAvatar } from "../middleware/uploadMiddleware";
-
+import { adminSchemas, adminSchemasUser } from "../validations/adminValidation";
+import {
+  uploadAvatar,
+  uploadAvatarAdmin,
+} from "../middleware/uploadMiddleware";
+import { generateUserId } from "../services/generateId ";
+import multer from "multer";
+const upload = multer();
 const router = Router();
 
 router.get("test", (req: Request, res: Response) => {
@@ -146,11 +151,16 @@ router.get("/list/user", AdminController.listUsersPermission);
 router.post(
   "/users/:id/avatar", // ✅ ระบุ user id ใน params
   authMiddleware,
-
   uploadAvatar,
   AdminController.uploadAvatarByAdmin,
 );
-router.post("/users", AdminController.createUser);
+router.post(
+  "/users",
+  generateUserId,
+  uploadAvatarAdmin,
+  useValidation({ body: adminSchemasUser.create }),
+  AdminController.createUser,
+);
 
 router.get("/users", AdminController.listUsers);
 

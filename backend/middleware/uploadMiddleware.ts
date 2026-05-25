@@ -8,8 +8,6 @@ import { error, log } from "node:console";
 import { file } from "zod";
 import { ImageBlog } from "../models";
 
-const uploadDir = path.join(__dirname, "../../update");
-const uploadDirPost = path.join(__dirname, "../../update/post");
 declare global {
   namespace Express {
     interface Request {
@@ -52,96 +50,64 @@ const upload = multer({
     }
   },
 });
+
 const createUploadMiddleware =
   (fieldName: string, getTargetDir: (req: Request) => string) =>
   (req: Request, res: Response, next: NextFunction) => {
     upload.single(fieldName)(req, res, async (err) => {
+      console.log("📦 req.file:", req.file);
+
       if (err) {
         req.multerError = {
           type: err instanceof multer.MulterError ? "multer" : "unknown",
           message: err.message,
         };
+
         return next();
       }
 
-      if (!req.file || !req.file.buffer) return next();
+      // ✅ ไม่มีไฟล์ => ข้าม
+      if (!req.file) {
+        console.log("⏭️ no file upload");
+
+        return next();
+      }
 
       try {
-        const userId = req.user?.userId;
-        if (!userId) throw new Error("Unauthorized");
+        const userId = (req as any).userId;
+
+        if (!userId) {
+          throw new Error("Unauthorized");
+        }
 
         const filename = `${Date.now()}-${uuidv4()}.jpg`;
+
         const targetDir = getTargetDir(req);
 
-        // ensure dir exists
         fs.mkdirSync(targetDir, { recursive: true });
 
         const outputPath = path.join(targetDir, filename);
 
+        // ✅ sharp using buffer
         await sharp(req.file.buffer).jpeg({ quality: 90 }).toFile(outputPath);
 
-        // relative path สำหรับ DB/frontend
+        // ✅ relative path
         const relativePath = `/upload/${userId}/avatar/${filename}`;
 
         req.file.filename = filename;
         req.file.path = relativePath;
-        (req.file as any).fullPath = outputPath; // absolute path สำหรับจัดการไฟล์จริง
 
-        // console.log({ relativePath });
+        (req.file as any).fullPath = outputPath;
+
+        console.log("✅ upload success:", relativePath);
+
         return next();
       } catch (sharpError: any) {
-        if (sharpError?.message === "Unauthorized") {
-          return res.status(401).json({ message: "Unauthorized" });
-        }
         req.multerError = {
           type: "sharp",
           message: sharpError?.message || "Image processing error",
         };
-        return next();
-      }
-    });
-  };
 
-const createUploadMultipleMiddleware =
-  (
-    fieldName: string,
-    maxCount: number,
-    getTargetDir: (req: Request) => string,
-  ) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    upload.array(fieldName, maxCount)(req, res, async (err: any) => {
-      if (err) {
-        req.multerError = {
-          type: err instanceof multer.MulterError ? "multer" : "unknown",
-          message: err.message,
-        };
-        return next();
-      }
-
-      const files = req.files as Express.Multer.File[];
-      if (!files || files.length === 0) return next();
-
-      try {
-        const targetDir = getTargetDir(req);
-        const processedFiles: Express.Multer.File[] = [];
-        for (const file of files) {
-          const filename = `${Date.now()}-${uuidv4()}.jpg`;
-          const outputPath = path.join(ensureDir(targetDir), filename);
-          await sharp(file.buffer).jpeg({ quality: 90 }).toFile(outputPath);
-
-          processedFiles.push({ ...file, filename, path: outputPath });
-        }
-
-        req.files = processedFiles;
-        return next();
-      } catch (sharpError: any) {
-        if (sharpError?.message === "Unauthorized") {
-          return res.status(401).json({ message: "Unauthorized" });
-        }
-        req.multerError = {
-          type: "sharp",
-          message: sharpError?.message || "Image processing error",
-        };
         return next();
       }
     });
@@ -160,18 +126,6 @@ export const uploadBlogCover = createUploadMiddleware("cover_image", (req) => {
   return path.join(__dirname, `../upload/${userId}/blog/cover`);
 });
 const MAX_BLOG_IMAGES = parseInt(process.env.MAX_BLOG_IMAGES || "5");
-
-// รูปประกอบใน blog (หลายรูป)
-// export const uploadBlogImage = createUploadMultipleMiddleware(
-//   "image",
-//   MAX_BLOG_IMAGES,
-//   (req) => {
-//     const userId = req.user?.userId;
-//     if (!userId) throw new Error("Unauthorized");
-
-//     return path.join(__dirname, `../upload/${userId}/blog/images`);
-//   },
-// );
 
 const uploadBlogFields = multer({
   storage: multer.memoryStorage(),
@@ -331,6 +285,51 @@ export const checkMaxBlogImages = async (
     });
   }
 };
-// ✅ ใช้ fields() รับทั้ง cover_image และ image พร้อมกัน
+export const uploadAvatarAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const upload = createUploadMiddleware("avatar", (req) => {
+    const userId = (req as any).userId;
 
+    const uploadPath = path.join(__dirname, `../upload/${userId}/avatar`);
+
+    // ✅ log path
+    console.log("📂 upload path:", uploadPath);
+
+    return uploadPath;
+  });
+
+  // ✅ log content type
+  console.log("📦 content-type:", req.headers["content-type"]);
+
+  // ไม่มี multipart => ข้าม
+  if (!req.headers["content-type"]?.includes("multipart/form-data")) {
+    console.log("⏭️ skip upload middleware");
+
+    return next();
+  }
+
+  upload(req, res, (err: any) => {
+    // ✅ multer error
+    if (err) {
+      console.log("❌ upload error:", err);
+
+      return res.status(400).json({
+        message: err.message,
+      });
+    }
+
+    // ✅ log file
+    console.log("📸 req.file:", req.file);
+
+    // ✅ log body
+    console.log("📝 req.body:", req.body);
+
+    next();
+  });
+};
+
+// ✅ ใช้ fields() รับทั้ง cover_image และ image พร้อมกัน
 // const uploadImageMiddleware = createUploadMiddleware("image", uploadDirPost);

@@ -11,6 +11,7 @@ import {
 import mongoose, { mongo, startSession } from "mongoose";
 import { error } from "node:console";
 import path from "path";
+import { endsWith } from "zod";
 const fs = require("fs");
 
 class AdminController {
@@ -1098,7 +1099,101 @@ class AdminController {
     }
   }
 
-  static async createUser(req: Request, res: Response) {}
+  static async createUser(req: Request, res: Response) {
+    const session = await mongoose.startSession();
+
+    // ✅ rollback file helper
+    const rollbackFile = () => {
+      try {
+        if (req.file?.path) {
+          const fullPath = path.join(__dirname, `../../${req.file.path}`);
+
+          if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+
+            console.log("🗑 rollback avatar:", fullPath);
+          }
+        }
+      } catch (fileErr) {
+        console.error("rollback file error:", fileErr);
+      }
+    };
+
+    try {
+      const { name, email, mobile, password, display_name, age, social_links } =
+        req.body;
+
+      // ✅ generated id
+      const userId =
+        (req as any).userId?.toString() ||
+        new mongoose.Types.ObjectId().toString();
+
+      // ✅ relative path from middleware
+      const avatar = req.file?.path || "";
+
+      let data: any = null;
+
+      await session.withTransaction(async () => {
+        // ✅ create user
+        const user = await User.create(
+          [
+            {
+              _id: userId,
+              name,
+              email,
+              mobile,
+              password,
+            },
+          ],
+          { session },
+        );
+
+        // ✅ create profile
+        const profile = await Profile.create(
+          [
+            {
+              user_id: userId,
+              display_name: display_name || name,
+              age: age || "",
+              avatar,
+              social_links: social_links || [],
+            },
+          ],
+          { session },
+        );
+
+        data = {
+          _id: userId,
+          name,
+          email,
+          mobile,
+          profile: {
+            display_name: profile[0].display_name,
+            age: profile[0].age,
+            avatar: profile[0].avatar,
+            social_links: profile[0].social_links,
+          },
+        };
+      });
+
+      return res.status(201).json({
+        message: "user create successfully",
+        data,
+      });
+    } catch (err: unknown) {
+      // ✅ rollback uploaded file
+      rollbackFile();
+
+      console.error(err);
+
+      return res.status(500).json({
+        message: "Server error",
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
   static async listUsers(req: Request, res: Response) {
     try {
       const page = Math.max(Number(req.query.page) || 1, 1);

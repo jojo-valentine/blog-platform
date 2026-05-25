@@ -448,7 +448,6 @@ export default function () {
       display_name: profileForm.profile.display_name,
       social_links: profileForm.profile.social_links,
     };
-    // console.log(formDate);
 
     try {
       const res = await axios.put(
