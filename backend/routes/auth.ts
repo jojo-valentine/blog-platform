@@ -47,7 +47,7 @@ router.post(
   "/profile/avatar",
   authMiddleware,
   uploadAvatar,
-  // useValidation({ body: profileSchemas.avatar }),
+  useValidation({ body: profileSchemas.avatar }),
   UserController.uploadAvatar,
 );
 router.patch(

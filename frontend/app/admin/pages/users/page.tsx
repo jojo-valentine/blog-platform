@@ -58,37 +58,31 @@ type formEdit = {
   _id: string;
   name: string;
   mobile: string;
-
+  email: string;
   profile: {
     display_name?: string;
     avatar?: string;
     age?: string;
-    social_links?: {
-      platform?: string;
-      url?: string;
-    }[];
+    social_links?: SocialLinkError[];
   };
 };
 type formEditError = {
   _id: string;
   name: string;
   mobile: string;
-
+  email: string;
   profile: {
     display_name?: string;
     avatar?: string;
     age?: string;
-    social_links?: {
-      platform?: string;
-      url?: string;
-    }[];
+    social_links?: SocialLinkError[];
   };
 };
 const initialFormEdit: formEdit = {
   _id: "",
   name: "",
   mobile: "",
-
+  email: "",
   profile: {
     display_name: "",
     avatar: "",
@@ -100,7 +94,7 @@ const initialFormEditError: formEditError = {
   _id: "",
   name: "",
   mobile: "",
-
+  email: "",
   profile: {
     display_name: "",
     avatar: "",
@@ -233,7 +227,7 @@ export default function PageUser() {
       _id: data._id,
       name: data.name ?? "",
       mobile: data.mobile ?? "",
-
+      email: data.email ?? "",
       profile: {
         display_name: data.profile?.display_name ?? "",
         avatar: data.profile?.avatar ?? "",
@@ -337,53 +331,78 @@ export default function PageUser() {
           [id]: value,
         },
       }));
+
+      setFromEditError((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          [id]: "",
+        },
+      }));
     } else {
       setFormEdit((prev) => ({
         ...prev,
         [id]: value,
       }));
+
+      setFromEditError((prev) => ({
+        ...prev,
+        [id]: "",
+      }));
     }
-    setFromEditError((prev) => ({
-      ...prev,
-      [id]: "",
-    }));
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setFormEditLoading(true);
-    setFromEditError(initialFormEditError);
+    setFromEditError(structuredClone(initialFormEditError));
+    console.log("social_links ที่ส่งไป:", formEdit.profile.social_links);
     try {
       const res = await axios.patch(
         `${API_URL}/api/admin/users/${formEdit._id}`,
-        formEdit,
-        { withCredentials: true },
+        {
+          name: formEdit.name,
+          email: formEdit.email,
+          mobile: formEdit.mobile,
+          profile: {
+            display_name: formEdit.profile.display_name || "",
+            age: formEdit.profile.age ?? null,
+            social_links: formEdit.profile.social_links ?? [],
+          },
+        },
+        {
+          withCredentials: true,
+        },
       );
+
+      const updatedUser = res.data.data;
+
+      // update form
       setFormEdit((prev) => ({
         ...prev,
-        mobile: res.data.data.mobile,
-        name: res.data.data.name,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        mobile: updatedUser.mobile,
         profile: {
-          ...prev.profile, // เก็บ avatar ไว้
-          age: res.data.data.profile?.age ?? "",
-          display_name: res.data.data.profile?.display_name ?? "",
-          social_links: res.data.data.profile?.social_links ?? [],
+          ...prev.profile,
+          display_name: updatedUser.profile?.display_name ?? "",
+          age: updatedUser.profile?.age ?? "",
+          social_links: updatedUser.profile?.social_links ?? [],
+          avatar: updatedUser.profile?.avatar ?? prev.profile.avatar,
         },
       }));
 
+      // update users list
       setUsers((prev) =>
         prev.map((user) =>
           user._id === formEdit._id
             ? {
                 ...user,
-                mobile: res.data.data.mobile,
-                name: res.data.data.name,
+                ...updatedUser,
                 profile: {
                   ...user.profile,
-                  age: res.data.data.profile?.age ?? "",
-                  display_name: res.data.data.profile?.display_name ?? "",
-                  social_links: res.data.data.profile?.social_links ?? [],
-                  avatar: user.profile ? (user.profile.avatar ?? "") : "", // เก็บ avatar เดิมไว้
+                  ...updatedUser.profile,
                 },
               }
             : user,
@@ -396,58 +415,68 @@ export default function PageUser() {
         icon: "success",
         timer: 1500,
         showConfirmButton: false,
-
         customClass: {
           container: "z-[999999]",
         },
       });
+
+      // optional
+      // setDialogUserEdit(false);
     } catch (error: any) {
       const err = error.response?.data;
 
       if (Array.isArray(err?.errors)) {
-        const fieldErrorsProfile = structuredClone(initialFormEditError);
-        err.errors.forEach(
-          (e: { field: keyof formEditError; message: string }) => {
-            if (e.field.startsWith("social_links")) {
-              const [, indexStr, key] = e.field.split(".");
-              const index = Number(indexStr);
-              if (isNaN(index)) return;
-              // ✅ เช็ค undefined ก่อน
-              if (!fieldErrorsProfile.profile) {
-                fieldErrorsProfile.profile = { social_links: [] };
-              }
+        const fieldErrors = structuredClone(initialFormEditError);
 
-              if (!fieldErrorsProfile.profile.social_links) {
-                fieldErrorsProfile.profile.social_links = [];
-              }
+        err.errors.forEach((e: any) => {
+          // social_links
+          if (e.field.startsWith("social_links")) {
+            const [, indexStr, key] = e.field.split(".");
+            const index = Number(indexStr);
 
-              if (!fieldErrorsProfile.profile.social_links[index]) {
-                fieldErrorsProfile.profile.social_links[index] = {};
-              }
+            if (isNaN(index)) return;
 
-              (fieldErrorsProfile.profile.social_links[index] as any)[key] =
-                e.message;
-            } else if (
-              e.field.startsWith("display_name") ||
-              e.field.startsWith("age")
-            ) {
-              fieldErrorsProfile.profile ??= {};
-              (fieldErrorsProfile.profile as any)[e.field] = e.message;
-            } else {
-              fieldErrorsProfile[e.field] = e.message;
+            fieldErrors.profile.social_links ??= [];
+
+            if (!fieldErrors.profile.social_links[index]) {
+              fieldErrors.profile.social_links[index] = {};
             }
-          },
-        );
-        setFromEditError(fieldErrorsProfile);
-      } else {
-        Swal.fire({
-          title: "Error",
-          icon: "error",
-          timer: 1500,
-          showConfirmButton: false,
-          text: err?.message || "Something went wrong",
+
+            (fieldErrors.profile.social_links[index] as any)[key] = e.message;
+
+            return;
+          }
+
+          // profile fields
+          if (
+            e.field === "display_name" ||
+            e.field === "age" ||
+            e.field === "avatar"
+          ) {
+            (fieldErrors.profile as any)[e.field] = e.message;
+
+            return;
+          }
+
+          // root fields
+          (fieldErrors as any)[e.field] = e.message;
         });
+
+        setFromEditError(fieldErrors);
+
+        return;
       }
+
+      Swal.fire({
+        title: "Error",
+        text: err?.message || "Something went wrong",
+        icon: "error",
+        timer: 1500,
+        showConfirmButton: false,
+        customClass: {
+          container: "z-[999999]",
+        },
+      });
     } finally {
       setFormEditLoading(false);
     }
@@ -457,30 +486,6 @@ export default function PageUser() {
     setFromCreateError(initialFormCreateError);
   };
 
-  const handleChangeCreate = async (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    const { id, name, value } = e.target;
-    if (["display_name", "age"].includes(id)) {
-      setFormCreate((prev) => ({
-        ...prev,
-        profile: {
-          ...prev.profile,
-          [id]: value,
-        },
-      }));
-    } else {
-      setFormCreate((prev) => ({
-        ...prev,
-        [id]: value,
-      }));
-    }
-
-    setFromCreateError((prev) => ({
-      ...prev,
-      [id]: "",
-    }));
-  };
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -502,11 +507,45 @@ export default function PageUser() {
     // console.log({ avatar: `${API_URL}${path}` });
     return `${API_URL}${path}`;
   };
-
   const handleAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // ✅ validate type
+    if (!file.type.startsWith("image/")) {
+      setFromCreateError((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          avatar: "Only image files allowed",
+        },
+      }));
+      setPreviewAvatar("");
+      return;
+    }
+
+    // ✅ validate size
+    if (file.size > 2 * 1024 * 1024) {
+      setFromCreateError((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          avatar: "Max 2MB allowed",
+        },
+      }));
+      setPreviewAvatar("");
+      return;
+    }
+
+    // ✅ ถ้าไฟล์ถูกต้อง → เคลียร์ error
+    setFromCreateError((prev) => ({
+      ...prev,
+      profile: {
+        ...prev.profile,
+        avatar: "",
+      },
+    }));
 
     // ✅ เก็บไฟล์ไว้ใน state
     setAvatarFile(file);
@@ -545,6 +584,39 @@ export default function PageUser() {
       },
     }));
   };
+  const handleChangeCreate = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    const { id, value } = e.target;
+
+    if (["display_name", "age"].includes(id)) {
+      setFormCreate((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          [id]: value,
+        },
+      }));
+
+      setFromCreateError((prev) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          [id]: "",
+        },
+      }));
+    } else {
+      setFormCreate((prev) => ({
+        ...prev,
+        [id]: value,
+      }));
+
+      setFromCreateError((prev) => ({
+        ...prev,
+        [id]: "",
+      }));
+    }
+  };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -578,10 +650,7 @@ export default function PageUser() {
       formData.append("confirm_password", formCreate.confirm_password);
 
       // profile
-      formData.append(
-        "display_name",
-        formCreate.profile.display_name || formCreate.name,
-      );
+      formData.append("display_name", formCreate.profile.display_name || "");
 
       formData.append("age", formCreate.profile.age || "");
 
@@ -601,17 +670,18 @@ export default function PageUser() {
       setFormCreate(initialFormCreate);
       setPreviewAvatar("");
       setAvatarFile(null);
+      setUsers((prev) => [res.data.data, ...prev]);
 
       // ✅ delay นิดนึงให้ dialog unmount
-      // setTimeout(() => {
-      //   Swal.fire({
-      //     icon: "success",
-      //     title: "Success",
-      //     text: res.data.message,
-      //     timer: 500,
-      //     showConfirmButton: false,
-      //   });
-      // }, 150);
+      setTimeout(() => {
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: res.data.message,
+          timer: 500,
+          showConfirmButton: false,
+        });
+      }, 150);
     } catch (error: any) {
       const err = error.response?.data;
 
@@ -619,42 +689,53 @@ export default function PageUser() {
         const fieldErrors = structuredClone(initialFormCreateError);
 
         err.errors.forEach((e: any) => {
+          // social_links
           if (e.field.startsWith("social_links")) {
             const [, indexStr, key] = e.field.split(".");
             const index = Number(indexStr);
 
-            if (!(fieldErrors.profile.social_links ?? [])[index]) {
-              (fieldErrors.profile.social_links ?? [])[index] = {};
+            if (!fieldErrors.profile.social_links) {
+              fieldErrors.profile.social_links = [];
             }
 
-            ((fieldErrors.profile.social_links ?? [])[index] as any)[key] =
-              e.message;
+            if (!fieldErrors.profile.social_links[index]) {
+              fieldErrors.profile.social_links[index] = {};
+            }
+
+            const oldMessage =
+              (fieldErrors.profile.social_links[index] as any)[key] || "";
+
+            (fieldErrors.profile.social_links[index] as any)[key] = oldMessage
+              ? `${oldMessage}\n${e.message}`
+              : e.message;
 
             return;
           }
 
+          // profile fields
           if (
             e.field === "display_name" ||
             e.field === "age" ||
             e.field === "avatar"
           ) {
-            (fieldErrors.profile as any)[e.field] = e.message;
+            const oldMessage = (fieldErrors.profile as any)[e.field] || "";
+
+            (fieldErrors.profile as any)[e.field] = oldMessage
+              ? `${oldMessage}\n${e.message}`
+              : e.message;
 
             return;
           }
 
-          (fieldErrors as any)[e.field] = e.message;
+          // normal fields
+          const oldMessage = (fieldErrors as any)[e.field] || "";
+
+          (fieldErrors as any)[e.field] = oldMessage
+            ? `${oldMessage}\n${e.message}`
+            : e.message;
         });
 
         setFromCreateError(fieldErrors);
-      } else {
-        setTimeout(() => {
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: error.response?.data?.message || "Something went wrong",
-          });
-        }, 100);
       }
     } finally {
       setFormCreateLoading(false);
@@ -999,7 +1080,11 @@ export default function PageUser() {
                         ) : null}
 
                         <AvatarFallback className="bg-primary text-3xl font-bold text-primary-foreground">
-                          {(displayName || formEdit.name || "U")
+                          {(
+                            formEdit.profile.display_name ||
+                            formEdit.name ||
+                            "U"
+                          )
                             .charAt(0)
                             .toUpperCase()}
                         </AvatarFallback>
@@ -1014,7 +1099,7 @@ export default function PageUser() {
                         </div>
 
                         <label
-                          htmlFor="avatar-upload"
+                          htmlFor="avatar-upload-edit"
                           className=" inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-muted"
                         >
                           {uploadingAvatar ? (
@@ -1032,7 +1117,7 @@ export default function PageUser() {
                         </label>
 
                         <input
-                          id="avatar-upload"
+                          id="avatar-upload-edit"
                           type="file"
                           accept="image/*"
                           hidden
@@ -1074,13 +1159,12 @@ export default function PageUser() {
                             }`}
                             onChange={handleChangeEdit}
                           />
-                          {formEditError.name && (
-                            <div className="mt-2 flex items-center gap-2 text-sm text-red-600 animate-pulse">
-                              <span>⚠️</span>
-                              <p>{formEditError.name}</p>
-                            </div>
-                          )}
                         </div>
+                        {formEditError.name && (
+                          <p className="text-sm text-red-500">
+                            {formEditError.name}
+                          </p>
+                        )}
                       </div>
 
                       {/* Display Name */}
@@ -1101,15 +1185,40 @@ export default function PageUser() {
                             }`}
                             onChange={handleChangeEdit}
                           />
-                          {formEditError.profile.display_name && (
-                            <div className="mt-2 flex items-center gap-2 text-sm text-red-600 animate-pulse">
-                              <span>⚠️</span>
-                              <p>{formEditError.profile.display_name}</p>
-                            </div>
-                          )}
                         </div>
+                        {formEditError.profile.display_name && (
+                          <p className="text-sm text-red-500">
+                            {formEditError.profile.display_name}
+                          </p>
+                        )}
                       </div>
+                      {/* Email */}
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
 
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                          <Input
+                            id="email"
+                            type="email"
+                            value={formEdit.email}
+                            placeholder="Email"
+                            className={`pl-10 ${
+                              formEditError.email
+                                ? "border-red-500 ring-1 ring-red-500"
+                                : ""
+                            }`}
+                            onChange={handleChangeEdit}
+                          />
+                        </div>
+
+                        {formEditError.email && (
+                          <p className="text-sm text-red-500">
+                            {formEditError.email}
+                          </p>
+                        )}
+                      </div>
                       {/* Age */}
                       <div className="space-y-2">
                         <Label htmlFor="age">Age</Label>
@@ -1176,7 +1285,8 @@ export default function PageUser() {
                             Add social accounts
                           </p>
                         </div>
-                        {(formEdit?.profile?.social_links?.length ?? 0) < 5 && (
+
+                        {(formEdit.profile.social_links?.length ?? 0) < 5 && (
                           <Button
                             type="button"
                             variant="outline"
@@ -1188,79 +1298,117 @@ export default function PageUser() {
                         )}
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {formEdit.profile.social_links?.map((link, index) => (
                           <div
                             key={index}
-                            className=" flex flex-col gap-3 rounded-xl border bg-background p-4 md:flex-row "
+                            className="
+          rounded-xl border bg-background p-4
+          flex flex-col gap-4 md:flex-row md:items-start
+        "
                           >
-                            <select
-                              value={link.platform}
-                              className=" rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                              onChange={(e) => {
-                                const newLinks = [
-                                  ...(formEdit?.profile?.social_links ?? []),
-                                ];
-                                newLinks[index].platform = e.target.value;
-                                // setSocial_links(newLinks);
-                                setFormEdit((prev) => ({
-                                  ...prev,
-                                  profile: {
-                                    ...prev.profile,
-                                    social_links: newLinks,
-                                  },
-                                }));
-                              }}
-                            >
-                              <option value="">Select Platform</option>
+                            {/* platform */}
+                            <div className="w-full md:w-52">
+                              <select
+                                value={link.platform}
+                                className={`
+              w-full rounded-lg border bg-background px-3 py-2 text-sm
+              ${
+                formEditError.profile.social_links?.[index]?.platform
+                  ? "border-red-500 ring-1 ring-red-500"
+                  : "border-border"
+              }
+            `}
+                                onChange={(e) => {
+                                  const newLinks = [
+                                    ...(formEdit.profile.social_links ?? []),
+                                  ];
 
-                              <option value="youtube">YouTube</option>
+                                  newLinks[index].platform = e.target.value;
 
-                              <option value="instagram">Instagram</option>
+                                  setFormEdit((prev) => ({
+                                    ...prev,
+                                    profile: {
+                                      ...prev.profile,
+                                      social_links: newLinks,
+                                    },
+                                  }));
+                                }}
+                              >
+                                <option value="">Select Platform</option>
+                                <option value="youtube">YouTube</option>
+                                <option value="instagram">Instagram</option>
+                                <option value="facebook">Facebook</option>
+                                <option value="other">Other</option>
+                              </select>
 
-                              <option value="facebook">Facebook</option>
+                              {formEditError.profile.social_links?.[index]
+                                ?.platform && (
+                                <p className="mt-1 text-sm text-red-500">
+                                  {
+                                    formEditError.profile.social_links[index]
+                                      ?.platform
+                                  }
+                                </p>
+                              )}
+                            </div>
 
-                              <option value="other">Other</option>
-                            </select>
+                            {/* url */}
+                            <div className="flex-1">
+                              <Input
+                                type="text"
+                                value={link.url}
+                                placeholder="https://..."
+                                className={`
+              w-full
+              ${
+                formEditError.profile.social_links?.[index]?.url
+                  ? "border-red-500 ring-1 ring-red-500"
+                  : ""
+              }
+            `}
+                                onChange={(e) => {
+                                  const newLinks = [
+                                    ...(formEdit.profile.social_links ?? []),
+                                  ];
 
-                            <Input
-                              type="text"
-                              value={link.url}
-                              placeholder="https://..."
-                              // className="flex-1"
-                              className={`pl-10 ${
-                                formEditError.profile?.social_links?.[index]
-                                  ?.url
-                                  ? "border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                                  : ""
-                              } basis-8/12 border p-2 rounded`}
-                              onChange={(e) => {
-                                const newLinks = [
-                                  ...(formEdit?.profile?.social_links ?? []),
-                                ];
-                                newLinks[index].url = e.target.value;
-                                setFormEdit((prev) => ({
-                                  ...prev,
-                                  profile: {
-                                    ...prev.profile,
-                                    social_links: newLinks,
-                                  },
-                                }));
-                              }}
-                            />
+                                  newLinks[index].url = e.target.value;
 
+                                  setFormEdit((prev) => ({
+                                    ...prev,
+                                    profile: {
+                                      ...prev.profile,
+                                      social_links: newLinks,
+                                    },
+                                  }));
+                                }}
+                              />
+
+                              {formEditError.profile.social_links?.[index]
+                                ?.url && (
+                                <p className="mt-1 text-sm text-red-500">
+                                  {
+                                    formEditError.profile.social_links[index]
+                                      ?.url
+                                  }
+                                </p>
+                              )}
+                            </div>
+
+                            {/* delete */}
                             <Button
                               type="button"
                               variant="destructive"
+                              className="md:self-start"
                               onClick={() => {
                                 setFormEdit((prev) => ({
                                   ...prev,
                                   profile: {
                                     ...prev.profile,
                                     social_links:
-                                      prev.profile?.social_links?.filter(
+                                      prev.profile.social_links?.filter(
                                         (_, i) => i !== index,
-                                      ),
+                                      ) ?? [],
                                   },
                                 }));
                               }}
@@ -1583,69 +1731,86 @@ export default function PageUser() {
                       bg-background p-4 md:flex-row
                     "
                       >
-                        <select
-                          value={link.platform}
-                          className="
-                        rounded-lg border border-border
-                        bg-background px-3 py-2 text-sm
-                      "
-                          onChange={(e) => {
-                            const newLinks = [
-                              ...(formCreate.profile.social_links ?? []),
-                            ];
+                        <div className="flex-1 ">
+                          <select
+                            value={link.platform}
+                            className={`flex-1 w-full rounded-lg border border-border
+                        bg-background px-3 py-2 text-sm  ${
+                          formCreateError.profile.social_links?.[index]
+                            ?.platform
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                            onChange={(e) => {
+                              const newLinks = [
+                                ...(formCreate.profile.social_links ?? []),
+                              ];
 
-                            newLinks[index].platform = e.target.value;
+                              newLinks[index].platform = e.target.value;
 
-                            setFormCreate((prev) => ({
-                              ...prev,
-                              profile: {
-                                ...prev.profile,
-                                social_links: newLinks,
-                              },
-                            }));
-                          }}
-                        >
-                          <option value="">Select Platform</option>
+                              setFormCreate((prev) => ({
+                                ...prev,
+                                profile: {
+                                  ...prev.profile,
+                                  social_links: newLinks,
+                                },
+                              }));
+                            }}
+                          >
+                            <option value="">Select Platform</option>
 
-                          <option value="youtube">YouTube</option>
+                            <option value="youtube">YouTube</option>
 
-                          <option value="instagram">Instagram</option>
+                            <option value="instagram">Instagram</option>
 
-                          <option value="facebook">Facebook</option>
+                            <option value="facebook">Facebook</option>
 
-                          <option value="other">Other</option>
-                        </select>
+                            <option value="other">Other</option>
+                          </select>
+                          {formCreateError.profile.social_links?.[index]
+                            ?.platform && (
+                            <p className="mt-1 text-sm text-red-500">
+                              {
+                                formCreateError.profile.social_links[index]
+                                  ?.platform
+                              }
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <Input
+                            type="text"
+                            value={link.url}
+                            placeholder="https://..."
+                            className={`flex-1 ${
+                              formCreateError.profile.social_links?.[index]?.url
+                                ? "border-red-500 ring-1 ring-red-500"
+                                : ""
+                            }`}
+                            onChange={(e) => {
+                              const newLinks = [
+                                ...(formCreate.profile.social_links ?? []),
+                              ];
 
-                        <Input
-                          type="text"
-                          value={link.url}
-                          placeholder="https://..."
-                          className={`flex-1 ${
-                            formCreateError.profile?.social_links?.[index]?.url
-                              ? "border-red-500 ring-1 ring-red-500"
-                              : ""
-                          }`}
-                          onChange={(e) => {
-                            const newLinks = [
-                              ...(formCreate.profile.social_links ?? []),
-                            ];
+                              newLinks[index].url = e.target.value;
 
-                            newLinks[index].url = e.target.value;
+                              setFormCreate((prev) => ({
+                                ...prev,
+                                profile: {
+                                  ...prev.profile,
+                                  social_links: newLinks,
+                                },
+                              }));
+                            }}
+                          />
 
-                            setFormCreate((prev) => ({
-                              ...prev,
-                              profile: {
-                                ...prev.profile,
-                                social_links: newLinks,
-                              },
-                            }));
-                          }}
-                        />
-                        {formCreateError.profile.social_links?.[index]?.url && (
-                          <p className="mt-1 text-sm text-red-500">
-                            {formCreateError.profile.social_links[index]?.url}
-                          </p>
-                        )}
+                          {formCreateError.profile.social_links?.[index]
+                            ?.url && (
+                            <p className="mt-1 text-sm text-red-500">
+                              {formCreateError.profile.social_links[index]?.url}
+                            </p>
+                          )}
+                        </div>
 
                         <Button
                           type="button"
@@ -1687,6 +1852,7 @@ export default function PageUser() {
                             ? "border-red-500 ring-1 ring-red-500"
                             : ""
                         }`}
+                        minLength={6}
                         onChange={handleChangeCreate}
                       />
 
@@ -1726,6 +1892,7 @@ export default function PageUser() {
                             ? "border-red-500 ring-1 ring-red-500"
                             : ""
                         }`}
+                        minLength={6}
                         onChange={handleChangeCreate}
                       />
 

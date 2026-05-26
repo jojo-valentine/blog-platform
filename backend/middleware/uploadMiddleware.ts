@@ -62,19 +62,19 @@ const createUploadMiddleware =
           type: err instanceof multer.MulterError ? "multer" : "unknown",
           message: err.message,
         };
-
         return next();
       }
 
-      // ✅ ไม่มีไฟล์ => ข้าม
       if (!req.file) {
         console.log("⏭️ no file upload");
-
         return next();
       }
 
       try {
-        const userId = (req as any).userId;
+        const targetDir = getTargetDir(req); // ← ได้ path จาก caller แล้ว
+
+        // ดึง userId จาก params.id ก่อน fallback ไป token
+        const userId = req.params.id ?? (req as any).userId;
 
         if (!userId) {
           throw new Error("Unauthorized");
@@ -82,21 +82,16 @@ const createUploadMiddleware =
 
         const filename = `${Date.now()}-${uuidv4()}.jpg`;
 
-        const targetDir = getTargetDir(req);
-
         fs.mkdirSync(targetDir, { recursive: true });
 
         const outputPath = path.join(targetDir, filename);
 
-        // ✅ sharp using buffer
         await sharp(req.file.buffer).jpeg({ quality: 90 }).toFile(outputPath);
 
-        // ✅ relative path
-        const relativePath = `/upload/${userId}/avatar/${filename}`;
+        const relativePath = `/upload/${userId}/avatar/${filename}`; // ← ใช้ userId ที่ถูก
 
         req.file.filename = filename;
         req.file.path = relativePath;
-
         (req.file as any).fullPath = outputPath;
 
         console.log("✅ upload success:", relativePath);
@@ -107,12 +102,10 @@ const createUploadMiddleware =
           type: "sharp",
           message: sharpError?.message || "Image processing error",
         };
-
         return next();
       }
     });
   };
-
 export const uploadAvatar = createUploadMiddleware("avatar", (req) => {
   const userId = req.user?.userId;
   if (!userId) throw new Error("Unauthorized");
@@ -291,40 +284,30 @@ export const uploadAvatarAdmin = (
   next: NextFunction,
 ) => {
   const upload = createUploadMiddleware("avatar", (req) => {
-    const userId = (req as any).userId;
+    const userId = req.params.id ?? (req as any).userId; // ← ใช้ params.id ก่อน
 
     const uploadPath = path.join(__dirname, `../upload/${userId}/avatar`);
 
-    // ✅ log path
     console.log("📂 upload path:", uploadPath);
 
     return uploadPath;
   });
 
-  // ✅ log content type
   console.log("📦 content-type:", req.headers["content-type"]);
+  console.log("🆔 user id:", req.params.id); // ← log ด้วย
 
-  // ไม่มี multipart => ข้าม
   if (!req.headers["content-type"]?.includes("multipart/form-data")) {
     console.log("⏭️ skip upload middleware");
-
     return next();
   }
 
   upload(req, res, (err: any) => {
-    // ✅ multer error
     if (err) {
       console.log("❌ upload error:", err);
-
-      return res.status(400).json({
-        message: err.message,
-      });
+      return res.status(400).json({ message: err.message });
     }
 
-    // ✅ log file
     console.log("📸 req.file:", req.file);
-
-    // ✅ log body
     console.log("📝 req.body:", req.body);
 
     next();

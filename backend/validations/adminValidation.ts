@@ -90,7 +90,11 @@ const filedUserProfile = {
     }),
   token: z.string().length(64, "Invalid token format"), // sha256 = 64 chars
   displayName: z.string().min(1, "Display name is required"),
-  age: z.coerce.number().min(0).max(120).optional().nullable(),
+  age: z.preprocess(
+    (val) =>
+      val === "" || val === null || val === undefined ? undefined : Number(val),
+    z.number().min(0).max(120).optional(),
+  ),
   socialLinks: z.preprocess(
     (value) => {
       if (typeof value === "string") {
@@ -100,18 +104,22 @@ const filedUserProfile = {
           return [];
         }
       }
-
       return value;
     },
-
     z
       .array(
         z.object({
-          platform: z.string().optional(),
-          url: z.string().url(),
+          platform: z.string().min(1, "Platform is required"), // ✅ ต้องมีค่า
+          url: z.string().url("Invalid URL"), // ✅ ต้องเป็น URL
         }),
       )
-      .optional(),
+      .optional()
+      .transform((links) =>
+        links?.map((item) => ({
+          platform: item.platform || "unknown", // fallback ถ้าไม่มีค่า
+          url: item.url,
+        })),
+      ),
   ),
 };
 export const adminSchemas = {
@@ -127,13 +135,27 @@ export const adminSchemasUser = {
       email: filedUserProfile.email,
       mobile: filedUserProfile.mobile,
       display_name: filedUserProfile.displayName,
-      age: filedUserProfile.age,
-      social_links: filedUserProfile.socialLinks,
-      password: filedUserProfile.name,
-      confirm_password: filedUserProfile.name,
+      age: filedUserProfile.age.optional(),
+      social_links: filedUserProfile.socialLinks.optional(),
+      password: filedUserProfile.password,
+      confirm_password: filedUserProfile.password_confirm,
     })
     .refine((data) => data.password === data.confirm_password, {
       message: "Passwords do not match",
       path: ["confirm_password"],
     }),
+
+  update: z.object({
+    name: filedUserProfile.name.optional(),
+    mobile: filedUserProfile.mobile.optional(),
+    email: filedUserProfile.email.optional(),
+
+    profile: z
+      .object({
+        display_name: filedUserProfile.displayName.optional(),
+        age: filedUserProfile.age.optional(),
+        social_links: filedUserProfile.socialLinks.optional(),
+      })
+      .optional(),
+  }),
 };

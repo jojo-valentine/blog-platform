@@ -7,7 +7,6 @@ const ProfileSchema = new Schema<IProfile>(
     display_name: { type: String, required: true },
     age: { type: String, default: null },
     avatar: { type: String, default: null },
-
     social_links: [
       {
         platform: { type: String, required: true },

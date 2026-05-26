@@ -151,11 +151,12 @@ router.get("/list/user", AdminController.listUsersPermission);
 router.post(
   "/users/:id/avatar", // ✅ ระบุ user id ใน params
   authMiddleware,
-  uploadAvatar,
+  uploadAvatarAdmin,
   AdminController.uploadAvatarByAdmin,
 );
 router.post(
   "/users",
+  authMiddleware,
   generateUserId,
   uploadAvatarAdmin,
   useValidation({ body: adminSchemasUser.create }),
@@ -165,6 +166,10 @@ router.post(
 router.get("/users", AdminController.listUsers);
 
 router.get("/users/:id", AdminController.getUserById);
-
-router.patch("/users/:id", AdminController.updateUser);
+router.patch(
+  "/users/:id",
+  authMiddleware,
+  useValidation({ body: adminSchemasUser.update }),
+  AdminController.updateUser,
+);
 export default router;

@@ -1122,7 +1122,53 @@ class AdminController {
     try {
       const { name, email, mobile, password, display_name, age, social_links } =
         req.body;
+      const errors: { field: string; message: string }[] = [];
+      const existingUser = await User.findOne({
+        $or: [{ email }, { mobile }, { name }],
+      });
 
+      const existingProfile = await Profile.findOne({
+        display_name,
+      });
+
+      if (existingUser || existingProfile) {
+        const errors: { field: string; message: string }[] = [];
+
+        // user
+        if (existingUser?.email === email) {
+          errors.push({
+            field: "email",
+            message: "Email already exists",
+          });
+        }
+
+        if (existingUser?.mobile === mobile) {
+          errors.push({
+            field: "mobile",
+            message: "Mobile already exists",
+          });
+        }
+
+        if (existingUser?.name === name) {
+          errors.push({
+            field: "name",
+            message: "Name already exists",
+          });
+        }
+
+        // profile
+        if (existingProfile?.display_name === display_name) {
+          errors.push({
+            field: "display_name",
+            message: "Display name already exists",
+          });
+        }
+
+        return res.status(400).json({
+          message: "Validation error",
+          errors,
+        });
+      }
       // ✅ generated id
       const userId =
         (req as any).userId?.toString() ||
@@ -1130,7 +1176,6 @@ class AdminController {
 
       // ✅ relative path from middleware
       const avatar = req.file?.path || "";
-
       let data: any = null;
 
       await session.withTransaction(async () => {
@@ -1274,6 +1319,7 @@ class AdminController {
     const targetUserId = Array.isArray(req.params.id)
       ? req.params.id[0]
       : req.params.id; // ✅ ใช้ id จาก params
+    console.log({ targetUserId });
 
     // ✅ validate id
     if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
@@ -1344,7 +1390,7 @@ class AdminController {
       const idParam = Array.isArray(req.params.id)
         ? req.params.id[0]
         : req.params.id;
-      const { name, mobile, profile } = req.body;
+      const { name, mobile, email, profile } = req.body;
 
       // ✅ validate id
       if (!mongoose.Types.ObjectId.isValid(idParam)) {
@@ -1378,7 +1424,7 @@ class AdminController {
         // ✅ update user
         await User.updateOne(
           { _id: idParam },
-          { $set: { name, mobile } },
+          { $set: { name, mobile, email } },
           { session },
         );
 
@@ -1387,8 +1433,8 @@ class AdminController {
           { user_id: idParam },
           {
             $set: {
-              display_name: profile?.display_name ?? profileUser?.display_name,
-              age: profile?.age ?? profileUser?.age,
+              display_name: profile?.display_name ?? "",
+              age: profile?.age ?? "",
               avatar: profile?.avatar ?? "",
               social_links:
                 profile?.social_links ?? profileUser?.social_links ?? [],
@@ -1401,6 +1447,7 @@ class AdminController {
           _id: user._id,
           name,
           mobile,
+          email,
           profile: {
             display_name: updatedProfile?.display_name,
             age: updatedProfile?.age,
