@@ -12,6 +12,8 @@ import mongoose, { mongo, startSession } from "mongoose";
 import { error } from "node:console";
 import path from "path";
 import { endsWith } from "zod";
+import bcrypt from "bcrypt";
+
 const fs = require("fs");
 
 class AdminController {
@@ -1012,7 +1014,6 @@ class AdminController {
       await session.endSession();
     }
   }
-
   static async listUsersPermission(req: Request, res: Response) {
     try {
       const data = await User.find(
@@ -1098,7 +1099,6 @@ class AdminController {
       await session.endSession();
     }
   }
-
   static async createUser(req: Request, res: Response) {
     const session = await mongoose.startSession();
 
@@ -1286,7 +1286,7 @@ class AdminController {
 
       const [users, total] = await Promise.all([
         User.find(filter)
-          .select("name email mobile createdAt")
+          .select("name email mobile createdAt suspended")
           .populate({
             path: "profile",
             match: {
@@ -1313,8 +1313,6 @@ class AdminController {
       });
     }
   }
-  static async getUserById(req: Request, res: Response) {}
-
   static async uploadAvatarByAdmin(req: Request, res: Response) {
     const targetUserId = Array.isArray(req.params.id)
       ? req.params.id[0]
@@ -1382,7 +1380,6 @@ class AdminController {
       await session.endSession();
     }
   }
-
   static async updateUser(req: Request, res: Response) {
     const session = await mongoose.startSession();
 
@@ -1464,6 +1461,90 @@ class AdminController {
       });
     } catch (error: unknown) {
       console.error("🔥 updateUser ERROR =>", error);
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Server error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+  static async toggleUserSuspension(req: Request, res: Response) {
+    const userId = req.params.id;
+    const session = await mongoose.startSession();
+
+    try {
+      const { suspended } = req.body;
+
+      let result: any = null;
+
+      await session.withTransaction(async () => {
+        const user = await User.findById(userId).session(session);
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        // ✅ toggle suspended
+        user.suspended = suspended;
+
+        await user.save({ session });
+
+        result = {
+          _id: user._id,
+          name: user.name,
+          mobile: user.mobile,
+          suspended: user.suspended,
+        };
+      });
+
+      return res.status(200).json({
+        message: "suspend successfully",
+        data: result,
+      });
+    } catch (error: unknown) {
+      console.error("🔥 toggleUserSuspension ERROR =>", error);
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Server error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+  static async changePasswordUser(req: Request, res: Response) {
+    const session = await mongoose.startSession();
+
+    try {
+      const rawId = req.params.id; // type: string | string[]
+
+      const id = Array.isArray(rawId) ? rawId[0] : rawId; // ✅ บังคับให้เป็น string
+      const { password, confirm_password } = req.body;
+
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          message: "Invalid user id",
+        });
+      }
+
+      await session.withTransaction(async () => {
+        const user = await User.findById(id).session(session);
+
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        // ✅ hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        user.password = hashedPassword;
+
+        await user.save({ session });
+      });
+
+      return res.status(200).json({
+        message: "Password updated successfully",
+      });
+    } catch (error: unknown) {
+      console.error("🔥 changePasswordUser ERROR =>", error);
+
       return res.status(500).json({
         message: error instanceof Error ? error.message : "Server error",
       });

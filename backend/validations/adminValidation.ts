@@ -158,4 +158,13 @@ export const adminSchemasUser = {
       })
       .optional(),
   }),
+  changPassword: z
+    .object({
+      password: filedUserProfile.password,
+      confirm_password: filedUserProfile.password_confirm,
+    })
+    .refine((data) => data.password === data.confirm_password, {
+      message: "Passwords do not match",
+      path: ["confirm_password"],
+    }),
 };

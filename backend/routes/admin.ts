@@ -152,6 +152,7 @@ router.post(
   "/users/:id/avatar", // ✅ ระบุ user id ใน params
   authMiddleware,
   uploadAvatarAdmin,
+  requireRole("admin"),
   AdminController.uploadAvatarByAdmin,
 );
 router.post(
@@ -159,17 +160,33 @@ router.post(
   authMiddleware,
   generateUserId,
   uploadAvatarAdmin,
+  requireRole("admin"),
   useValidation({ body: adminSchemasUser.create }),
   AdminController.createUser,
 );
 
 router.get("/users", AdminController.listUsers);
 
-router.get("/users/:id", AdminController.getUserById);
 router.patch(
   "/users/:id",
   authMiddleware,
+  requireRole("admin"),
   useValidation({ body: adminSchemasUser.update }),
   AdminController.updateUser,
 );
+router.patch(
+  "/users/:id/suspension",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.toggleUserSuspension,
+);
+router.patch(
+  "/users/:id/changePassword",
+  authMiddleware,
+  requireRole("admin"),
+  requirePermission("update_user"),
+  useValidation({ body: adminSchemasUser.changPassword }),
+  AdminController.changePasswordUser,
+);
+
 export default router;

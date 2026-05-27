@@ -1,6 +1,6 @@
 "use client";
 import { ContentLayout } from "@/app/components/admin/admin-panel/content-layout";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { use, useCallback, useEffect, useRef, useState } from "react";
 import { API_URL } from "@/app/lib/config";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -20,6 +20,7 @@ import {
   Eye,
   Lock,
   Upload,
+  UserKey,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/app/components/admin/ui/skeleton";
@@ -54,6 +55,25 @@ import { CardDescription } from "@/app/components/ui/card";
 type ErrorsImage = {
   avatar?: string;
 };
+type formPassword = {
+  _id: string;
+  password: string;
+  confirm_password: string;
+};
+type formPasswordError = {
+  password: string;
+  confirm_password: string;
+};
+const initialFormPassword: formPassword = {
+  _id: "",
+  password: "",
+  confirm_password: "",
+};
+const initialFormPasswordError: formPasswordError = {
+  password: "",
+  confirm_password: "",
+};
+
 type formEdit = {
   _id: string;
   name: string;
@@ -136,6 +156,20 @@ export type SocialLinkError = {
   url?: string;
 };
 
+type Users = {
+  _id: string;
+  name: string;
+  mobile: string;
+  email: string;
+  suspended: boolean;
+  createdAt: string;
+  profile: {
+    display_name: string;
+    age: string;
+    social_links: SocialLinkError[];
+    avatar: string;
+  };
+};
 const initialFormCreate: formCreate = {
   name: "",
   mobile: "",
@@ -170,7 +204,7 @@ export default function PageUser() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<Users[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [displayName, setDisplayName] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -189,6 +223,9 @@ export default function PageUser() {
   const [formCreateError, setFromCreateError] = useState<formCreateError>(
     initialFormCreateError,
   );
+  const [loadingChangePassword, setLoadingChangePassword] = useState(false);
+  const [dialogPassword, setDialogPassword] = useState(false);
+
   // const [loadingAvatar ,setLoadingAvatar] = useState
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewAvatar, setPreviewAvatar] = useState("");
@@ -216,6 +253,13 @@ export default function PageUser() {
       setLoadingUsers(false);
     }
   }, [page, debouncedSearch]);
+  const [loadingChangeSuspend, setLoadingChangeSuspend] = useState<
+    string | null
+  >(null);
+  const [formChangePassword, setFormChangePassword] =
+    useState<formPassword>(initialFormPassword);
+  const [formChangePasswordError, setFormChangePasswordError] =
+    useState<formPasswordError>(initialFormPasswordError);
   const handleEdit = async (id: string) => {
     setDialogUserEdit(true);
 
@@ -317,7 +361,6 @@ export default function PageUser() {
       setUploadingAvatar(false);
     }
   };
-
   const handleChangeEdit = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -351,7 +394,6 @@ export default function PageUser() {
       }));
     }
   };
-
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -485,7 +527,6 @@ export default function PageUser() {
     setDialogUserCreate(true);
     setFromCreateError(initialFormCreateError);
   };
-
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -498,7 +539,10 @@ export default function PageUser() {
       fetchDataUsers();
     }
   }, [user, fetchDataUsers, page, debouncedSearch]);
-
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    setPage(1); // reset page เมื่อเปลี่ยน keyword
+  };
   const getAvatarSrc = (avatar?: string) => {
     if (!avatar) return "/default/fallback/default-placeholder.png";
     if (avatar.startsWith("http")) return avatar;
@@ -645,15 +689,11 @@ export default function PageUser() {
 
         return;
       }
-
       formData.append("password", formCreate.password);
       formData.append("confirm_password", formCreate.confirm_password);
-
       // profile
       formData.append("display_name", formCreate.profile.display_name || "");
-
       formData.append("age", formCreate.profile.age || "");
-
       formData.append(
         "social_links",
         JSON.stringify(formCreate.profile.social_links || []),
@@ -665,7 +705,6 @@ export default function PageUser() {
 
       // ✅ ปิด dialog ก่อน
       setDialogUserCreate(false);
-
       // ✅ reset form
       setFormCreate(initialFormCreate);
       setPreviewAvatar("");
@@ -741,6 +780,178 @@ export default function PageUser() {
       setFormCreateLoading(false);
     }
   };
+  const handleSuspendUser = async (id: string, suspended: boolean) => {
+    const result = await Swal.fire({
+      title: suspended ? "Unsuspend user?" : "Suspend user?",
+      text: suspended
+        ? "This user will be able to use the system again."
+        : "This user will be blocked from using the system.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: suspended ? "Yes, unsuspend" : "Yes, suspend",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+      customClass: {
+        container: "z-[999999]",
+      },
+    });
+
+    // ❌ cancel
+    if (!result.isConfirmed) return;
+
+    setLoadingChangeSuspend(id);
+
+    try {
+      const res = await axios.patch(
+        `${API_URL}/api/admin/users/${id}/suspension`,
+        {
+          suspended: !suspended,
+        },
+        {
+          withCredentials: true,
+        },
+      );
+
+      // ✅ update state
+      setUsers((prev) =>
+        prev.map((u) =>
+          u._id === id
+            ? {
+                ...u,
+                suspended: !suspended,
+              }
+            : u,
+        ),
+      );
+
+      setTimeout(() => {
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: res.data.message,
+          timer: 1200,
+          showConfirmButton: false,
+          customClass: {
+            container: "z-[999999]",
+          },
+        });
+      }, 150);
+    } catch (err: any) {
+      setTimeout(() => {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: err.response?.data?.message || "Something went wrong.",
+          timer: 1500,
+          showConfirmButton: false,
+          customClass: {
+            container: "z-[999999]",
+          },
+        });
+      }, 150);
+    } finally {
+      setLoadingChangeSuspend(null);
+    }
+  };
+  const dialogPasswordPage = async (id: string) => {
+    const userId = users.map((prev) => prev._id === id);
+    if (!userId) {
+      return;
+    }
+    setDialogPassword(true);
+    setFormChangePassword((prev) => ({
+      ...prev,
+      _id: id,
+    }));
+
+    setFormChangePasswordError(initialFormPasswordError);
+  };
+  const handleChangePassword = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const { id, name, value } = e.target;
+    setFormChangePassword((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+
+    setFormChangePasswordError((prev) => ({
+      ...prev,
+      [id]: "",
+    }));
+  };
+  const handleSubmitPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoadingChangePassword(true);
+    setFormChangePasswordError({
+      password: "",
+      confirm_password: "",
+    });
+
+    try {
+      const res = await axios.patch(
+        `${API_URL}/api/admin/users/${formChangePassword._id}/changePassword`,
+        formChangePassword,
+        { withCredentials: true },
+      );
+      setTimeout(() => {
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: res.data.message,
+          timer: 1500,
+          showConfirmButton: false,
+          customClass: {
+            container: "z-[999999]",
+          },
+        });
+      }, 150);
+      // reset form
+      setFormChangePassword({
+        _id: "",
+        password: "",
+        confirm_password: "",
+      });
+      setDialogPassword(false);
+    } catch (error: any) {
+      const err = error.response?.data;
+
+      // ประกาศ fieldErrors นอก if
+      const fieldErrors: formPasswordError = {
+        password: "",
+        confirm_password: "",
+      };
+
+      if (Array.isArray(err?.errors)) {
+        err.errors.forEach(
+          (e: { field: keyof formPasswordError; message: string }) => {
+            if (e.field in fieldErrors) {
+              fieldErrors[e.field] = e.message;
+            }
+          },
+        );
+      } else {
+        // fallback ถ้า error ไม่ใช่ array
+        fieldErrors.confirm_password = err?.message || "Update failed";
+      }
+      setFormChangePasswordError(fieldErrors);
+
+      setTimeout(() => {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: err?.message || "Something went wrong",
+          timer: 1500,
+          showConfirmButton: false,
+          customClass: {
+            container: "z-[999999]",
+          },
+        });
+      }, 150);
+    } finally {
+      setLoadingChangePassword(false);
+    }
+  };
   return (
     <ContentLayout title="pageUser">
       {loading ? (
@@ -773,8 +984,8 @@ export default function PageUser() {
                   <input
                     type="text"
                     placeholder="Search roles..."
-                    // value={search}
-                    // onChange={(e) => handleSearch(e.target.value)}
+                    value={search}
+                    onChange={(e) => handleSearch(e.target.value)}
                     className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 lg:w-[320px]"
                   />
                 </div>
@@ -937,6 +1148,18 @@ export default function PageUser() {
                               size="icon"
                               variant="outline"
                               className="hover:bg-muted"
+                              onClick={() => {
+                                dialogPasswordPage(u._id);
+                              }}
+                              type="button"
+                            >
+                              <UserKey className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="hover:bg-muted"
                               onClick={() => handleEdit(u._id)}
                               type="button"
                             >
@@ -951,11 +1174,14 @@ export default function PageUser() {
                                   ? "border-green-500/30 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white"
                                   : "border-yellow-500/30 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-white"
                               }
-                              // onClick={() =>
-                              //   handleSuspendUser(u._id, u.suspended)
-                              // }
+                              onClick={() =>
+                                handleSuspendUser(u._id, u.suspended)
+                              }
+                              disabled={loadingChangeSuspend === u._id}
                             >
-                              {u.suspended ? (
+                              {loadingChangeSuspend === u._id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : u.suspended ? (
                                 <RotateCcw className="h-4 w-4" />
                               ) : (
                                 <Ban className="h-4 w-4" />
@@ -1448,7 +1674,6 @@ export default function PageUser() {
           )}
         </motion.div>
       )}
-
       {dialogUserCreate && (
         <Dialog
           open={dialogUserCreate}
@@ -1791,9 +2016,7 @@ export default function PageUser() {
                               const newLinks = [
                                 ...(formCreate.profile.social_links ?? []),
                               ];
-
                               newLinks[index].url = e.target.value;
-
                               setFormCreate((prev) => ({
                                 ...prev,
                                 profile: {
@@ -1838,10 +2061,8 @@ export default function PageUser() {
                 <div className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
@@ -1936,6 +2157,148 @@ export default function PageUser() {
                       </>
                     ) : (
                       "Create"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {dialogPassword && (
+        <Dialog
+          open={dialogPassword}
+          onOpenChange={(open) => {
+            setDialogPassword(open);
+
+            if (!open) {
+              setPreviewAvatar("");
+              setAvatarFile(null);
+
+              setFormCreate(initialFormCreate);
+              setFromCreateError(initialFormCreateError);
+            }
+          }}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="w-full"
+            >
+              <DialogHeader className="space-y-2">
+                <DialogTitle className="text-2xl font-bold">
+                  change password User
+                </DialogTitle>
+
+                <DialogDescription>change password user</DialogDescription>
+              </DialogHeader>
+              <form
+                onSubmit={handleSubmitPasswordChange}
+                className="mt-6 space-y-8"
+              >
+                {/* Password */}
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={formChangePassword.password}
+                        placeholder="Password"
+                        className={`pl-10 ${
+                          formChangePasswordError.password
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                        minLength={6}
+                        onChange={handleChangePassword}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {formChangePasswordError.password && (
+                      <p className="text-sm text-red-500">
+                        {formChangePasswordError.password}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm_password">Confirm Password</Label>
+
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                      <Input
+                        id="confirm_password"
+                        type={showPasswordConfirm ? "text" : "password"}
+                        value={formChangePassword.confirm_password}
+                        placeholder="Confirm Password"
+                        className={`pl-10 ${
+                          formChangePasswordError.confirm_password
+                            ? "border-red-500 ring-1 ring-red-500"
+                            : ""
+                        }`}
+                        minLength={6}
+                        onChange={handleChangePassword}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowPasswordConfirm(!showPasswordConfirm)
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                      >
+                        {showPasswordConfirm ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  {formChangePasswordError.confirm_password && (
+                    <p className="text-sm text-red-500">
+                      {formChangePasswordError.confirm_password}
+                    </p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-3 border-t pt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogUserCreate(false)}
+                  >
+                    Cancel
+                  </Button>
+
+                  <Button type="submit" disabled={loadingChangePassword}>
+                    {loadingChangePassword ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        update...
+                      </>
+                    ) : (
+                      "Update"
                     )}
                   </Button>
                 </div>
