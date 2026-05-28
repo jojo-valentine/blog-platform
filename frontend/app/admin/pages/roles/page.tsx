@@ -70,7 +70,7 @@ const initialFormError: RoleFormError = {
 };
 export default function PageRole() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: loadingAuth } = useAuth();
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [page, setPage] = useState(1);
@@ -126,9 +126,11 @@ export default function PageRole() {
   }, [page, debouncedSearch]);
 
   useEffect(() => {
-    if (user) {
-      fetchData();
+    if (!loadingAuth && !user) {
+      router.push("/");
+      return;
     }
+    fetchData();
   }, [user, fetchData]);
 
   const handleEdit = (id: string) => {
@@ -364,7 +366,7 @@ export default function PageRole() {
       );
       // อัพเดต state roles
       setRoles((prev) =>
-        prev.map((r) => (r._id === id ? { ...r, show: show  } : r)),
+        prev.map((r) => (r._id === id ? { ...r, show: show } : r)),
       );
       Swal.fire({
         title: "Success",

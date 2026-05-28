@@ -167,4 +167,11 @@ export const adminSchemasUser = {
       message: "Passwords do not match",
       path: ["confirm_password"],
     }),
+  updateAdminUser: z.object({
+    name: filedUserProfile.name.optional(),
+    mobile: filedUserProfile.mobile.optional(),
+    email: filedUserProfile.email.optional(),
+    display_name: filedUserProfile.displayName.optional(),
+    age: filedUserProfile.age.optional(),
+  }),
 };

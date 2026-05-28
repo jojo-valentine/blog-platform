@@ -231,10 +231,12 @@ export default function pagePosts() {
     return () => clearTimeout(timer);
   }, [search]);
   useEffect(() => {
-    if (user) {
-      fetchData();
-      fetchCategory();
+    if (!loadingAuth && !user) {
+      router.push("/");
+      return;
     }
+    fetchData();
+    fetchCategory();
   }, [user, fetchData, fetchCategory, page, debouncedSearch, selectedIds]);
   return (
     <ContentLayout title="categories">

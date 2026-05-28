@@ -92,11 +92,12 @@ const initialFormError: permissionsError = {
   roles: [] as string[],
 };
 export default function pageRoleManager() {
+  const router = useRouter();
   const [permissions, setPermissions] = useState<permissions[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingRole, setLoadingRole] = useState(false);
-  const { user } = useAuth();
+  const { user, loading: loadingAuth } = useAuth();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -442,11 +443,13 @@ export default function pageRoleManager() {
     return () => clearTimeout(timer);
   }, [search]);
   useEffect(() => {
-    if (user) {
-      fetchData();
-      fetchDataRole();
-      fetchDataUsers();
+    if (!loadingAuth && !user) {
+      router.push("/");
+      return;
     }
+    fetchData();
+    fetchDataRole();
+    fetchDataUsers();
   }, [
     user,
     fetchData,

@@ -6,6 +6,7 @@ import {
   SquarePen,
   LayoutGrid,
   LucideIcon,
+  StickyNote,
 } from "lucide-react";
 
 type Submenu = {
@@ -96,7 +97,7 @@ export function getMenuList(pathname: string): Group[] {
         {
           href: "",
           label: "user",
-          icon: SquarePen,
+          icon: Users,
           submenus: [
             {
               href: "/admin/pages/users/",
@@ -106,20 +107,30 @@ export function getMenuList(pathname: string): Group[] {
         },
       ],
     },
-    // {
-    //   groupLabel: "Settings",
-    //   menus: [
-    //     {
-    //       href: "/users",
-    //       label: "Users",
-    //       icon: Users
-    //    },
-    //     {
-    //       href: "/account",
-    //       label: "Account",
-    //       icon: Settings
-    //     }
-    //   ]
-    // }
+    {
+      groupLabel: "page",
+      menus: [
+        {
+          href: "/",
+          label: "first page",
+          icon: StickyNote,
+        },
+      ],
+    },
+    {
+      groupLabel: "Settings",
+      menus: [
+        // {
+        //   href: "/users",
+        //   label: "Users",
+        //   icon: Users,
+        // },
+        {
+          href: "/admin/pages/setting/change-password/",
+          label: "Account",
+          icon: Settings,
+        },
+      ],
+    },
   ];
 }

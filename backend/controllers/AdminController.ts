@@ -13,7 +13,8 @@ import { error } from "node:console";
 import path from "path";
 import { endsWith } from "zod";
 import bcrypt from "bcrypt";
-
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { IRole } from "../types";
 const fs = require("fs");
 
 class AdminController {
@@ -563,7 +564,6 @@ class AdminController {
       await session.endSession();
     }
   }
-
   static async toggleRole(req: Request, res: Response) {
     const id = req.params.id;
 
@@ -1317,7 +1317,6 @@ class AdminController {
     const targetUserId = Array.isArray(req.params.id)
       ? req.params.id[0]
       : req.params.id; // ✅ ใช้ id จาก params
-    console.log({ targetUserId });
 
     // ✅ validate id
     if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
@@ -1544,6 +1543,208 @@ class AdminController {
       });
     } catch (error: unknown) {
       console.error("🔥 changePasswordUser ERROR =>", error);
+
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Server error",
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+  static async getDataAdmin(req: Request, res: Response) {
+    try {
+      const refreshToken = req.cookies?.refreshToken;
+
+      if (!refreshToken) {
+        return res.status(401).json({
+          message: "No refresh token",
+        });
+      }
+
+      const decoded = jwt.verify(
+        refreshToken,
+        process.env.JWT_SECRET as string,
+      ) as JwtPayload & { id: string };
+
+      const user = await User.findById(decoded.id)
+        .populate({
+          path: "profile",
+          select: "avatar display_name age",
+        })
+        .lean();
+
+      if (!user) {
+        res.clearCookie("refreshToken");
+        res.clearCookie("accessToken");
+
+        return res.status(401).json({
+          message: "User not found",
+          forceLogout: true,
+        });
+      }
+
+      const hasRoles = await HasRole.find({
+        user_id: user._id,
+      })
+        .populate<{
+          role_id: IRole;
+        }>({
+          path: "role_id",
+          select: "name permissions",
+        })
+        .lean();
+
+      // roles
+      const roles = hasRoles.map((r) => r.role_id.name);
+
+      // permissions unique
+      const permissions = [
+        ...new Set(hasRoles.flatMap((r) => r.role_id.permissions || [])),
+      ];
+
+      return res.status(200).json({
+        message: "Get admin data success",
+        data: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          roles,
+          permissions,
+
+          profile: {
+            avatar: (user as any).profile?.avatar || "",
+            display_name: (user as any).profile?.display_name || "",
+            age: (user as any).profile?.age || "",
+          },
+        },
+      });
+    } catch (error: unknown) {
+      console.error("🔥 getDataAdmin ERROR =>", error);
+
+      if (
+        error instanceof jwt.TokenExpiredError ||
+        error instanceof jwt.JsonWebTokenError
+      ) {
+        res.clearCookie("refreshToken");
+        res.clearCookie("accessToken");
+
+        return res.status(401).json({
+          message: "Invalid token",
+          forceLogout: true,
+        });
+      }
+
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Server error",
+      });
+    }
+  }
+  static async updateDataAdmin(req: Request, res: Response) {
+    const userId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
+
+    // ✅ validate ก่อน session
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+
+    const { name, email, mobile, display_name, age } = req.body;
+    const file = req.file as Express.Multer.File | undefined;
+
+    const session = await mongoose.startSession();
+    let oldAvatar = "";
+    let result: any = null;
+
+    try {
+      await session.withTransaction(async () => {
+        // ✅ หา user
+        const user = await User.findById(userId).session(session);
+        if (!user) throw new Error("User not found");
+
+        // ✅ หา/สร้าง profile
+        let profile = await Profile.findOne({ user_id: userId }).session(
+          session,
+        );
+        if (!profile) {
+          [profile] = await Profile.create(
+            [{ user_id: userId, display_name: name }],
+            { session },
+          );
+        }
+
+        // ✅ จัดการ avatar
+        let avatarPath = profile.avatar;
+        if (file) {
+          oldAvatar = profile.avatar || "";
+          avatarPath = file.path.replace(/\\/g, "/"); // ✅ normalize path
+        }
+
+        // ✅ update user
+        await User.updateOne(
+          { _id: userId },
+          { $set: { name, email, mobile } },
+          { session },
+        );
+
+        // ✅ update profile
+        const updatedProfile = await Profile.findOneAndUpdate(
+          { user_id: userId },
+          { $set: { display_name, age, avatar: avatarPath } },
+          { new: true, session },
+        );
+
+        // ✅ ดึง roles
+        const hasRoles = await HasRole.find({ user_id: userId })
+          .populate<{ role_id: IRole }>("role_id")
+          .lean()
+          .session(session);
+
+        const roles = hasRoles.map((r) => r.role_id.name);
+
+        result = {
+          _id: user._id,
+          name,
+          email,
+          mobile,
+          roles,
+          profile: {
+            display_name: updatedProfile?.display_name || "",
+            age: updatedProfile?.age || "",
+            avatar: updatedProfile?.avatar || "",
+          },
+        };
+      });
+
+      // ✅ ลบรูปเก่าหลัง commit สำเร็จ
+      if (oldAvatar && file) {
+        const absolute = path.resolve(process.cwd(), "." + oldAvatar);
+        try {
+          if (fs.existsSync(absolute) && fs.lstatSync(absolute).isFile()) {
+            await fs.promises.unlink(absolute);
+          }
+        } catch (err) {
+          console.error("Delete old avatar error:", err);
+        }
+      }
+
+      return res.status(200).json({
+        message: "Update profile successfully",
+        data: result,
+      });
+    } catch (error: unknown) {
+      // ✅ ลบไฟล์ใหม่ถ้า transaction fail
+      if (file?.path) {
+        const absolute = path.resolve(file.path);
+        try {
+          if (fs.existsSync(absolute)) await fs.promises.unlink(absolute);
+        } catch {}
+      }
+
+      if (error instanceof Error && error.message === "User not found") {
+        return res.status(404).json({ message: "User not found" });
+      }
 
       return res.status(500).json({
         message: error instanceof Error ? error.message : "Server error",

@@ -189,4 +189,19 @@ router.patch(
   AdminController.changePasswordUser,
 );
 
+router.get(
+  "/user/account",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.getDataAdmin,
+);
+router.patch(
+  "/user/:id/account",
+  authMiddleware,
+  uploadAvatarAdmin,
+  requireRole("admin"),
+  useValidation({ body: adminSchemasUser.updateAdminUser }),
+  AdminController.updateDataAdmin,
+);
+
 export default router;

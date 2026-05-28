@@ -197,10 +197,11 @@ const initialFormCreateError: formCreateError = {
   },
 };
 export default function PageUser() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [dialogUserEdit, setDialogUserEdit] = useState(false);
-  const { user } = useAuth();
+  const { user, loading: loadingAuth } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -225,7 +226,6 @@ export default function PageUser() {
   );
   const [loadingChangePassword, setLoadingChangePassword] = useState(false);
   const [dialogPassword, setDialogPassword] = useState(false);
-
   // const [loadingAvatar ,setLoadingAvatar] = useState
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewAvatar, setPreviewAvatar] = useState("");
@@ -535,9 +535,11 @@ export default function PageUser() {
     return () => clearTimeout(timer);
   }, [search]);
   useEffect(() => {
-    if (user) {
-      fetchDataUsers();
+    if (!loadingAuth && !user) {
+      router.push("/");
+      return;
     }
+    fetchDataUsers();
   }, [user, fetchDataUsers, page, debouncedSearch]);
   const handleSearch = (val: string) => {
     setSearch(val);
@@ -598,7 +600,6 @@ export default function PageUser() {
     const previewUrl = URL.createObjectURL(file);
     setPreviewAvatar(previewUrl);
   };
-
   const addSocialLink = (
     setFormEdit: React.Dispatch<React.SetStateAction<typeof formEdit>>,
   ) => {
@@ -613,7 +614,6 @@ export default function PageUser() {
       },
     }));
   };
-
   const addSocialLinkCreate = (
     setFormCreate: React.Dispatch<React.SetStateAction<typeof formCreate>>,
   ) => {
@@ -661,7 +661,6 @@ export default function PageUser() {
       }));
     }
   };
-
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 

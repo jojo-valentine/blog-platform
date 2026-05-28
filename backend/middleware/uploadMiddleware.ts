@@ -55,7 +55,7 @@ const createUploadMiddleware =
   (fieldName: string, getTargetDir: (req: Request) => string) =>
   (req: Request, res: Response, next: NextFunction) => {
     upload.single(fieldName)(req, res, async (err) => {
-      console.log("📦 req.file:", req.file);
+      // console.log("📦 req.file:", req.file);
 
       if (err) {
         req.multerError = {
@@ -74,7 +74,7 @@ const createUploadMiddleware =
         const targetDir = getTargetDir(req); // ← ได้ path จาก caller แล้ว
 
         // ดึง userId จาก params.id ก่อน fallback ไป token
-        const userId = req.params.id ?? (req as any).userId;
+        const userId = req.params.id || req.user?.userId || (req as any).userId;
 
         if (!userId) {
           throw new Error("Unauthorized");
