@@ -63,4 +63,5 @@ router.delete(
 router.get("/home", BlogController.blogHome);
 router.get("/public", BlogController.blogPublicList);
 router.get("/:id/detail", BlogController.blogDetail);
+router.get("/profile/list/:id/post", BlogController.profileBlogger);
 export default router;

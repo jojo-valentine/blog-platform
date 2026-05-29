@@ -1753,5 +1753,25 @@ class AdminController {
       await session.endSession();
     }
   }
+  static async getDashboardSummary(req: Request, res: Response) {
+    try {
+      const [totalUsers, totalBlogs] = await Promise.all([
+        User.countDocuments(),
+        Blog.countDocuments(),
+      ]);
+
+      return res.status(200).json({
+        message: "success",
+        data: {
+          totalUsers,
+          totalBlogs,
+        },
+      });
+    } catch (error: unknown) {
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Server error",
+      });
+    }
+  }
 }
 export default AdminController;

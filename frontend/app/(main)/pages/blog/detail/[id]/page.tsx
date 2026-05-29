@@ -17,6 +17,7 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/app/components/ui/avatar";
+import Link from "next/link";
 type Gallery = {
   _id: string;
   path: string;
@@ -31,6 +32,7 @@ type Blog = {
   createdAt: string;
   gallery: Gallery[];
   user_id: {
+    _id: string;
     username: string;
     profile?: {
       avatar?: string;
@@ -68,6 +70,7 @@ export default function Page() {
 
         createdAt: data.createdAt,
         user_id: {
+          _id: data.user_id._id,
           username: data.user_id.username,
           profile: {
             display_name: data.user_id.profile?.display_name || "",
@@ -182,32 +185,37 @@ export default function Page() {
             )}
 
             <div className="flex items-center gap-3 mb-8 pb-8 border-b">
-              <Avatar className="h-10 w-10">
-                <AvatarImage
-                  src={getImageSrc(
-                    blog.user_id.profile?.avatar,
-                    "/default/avatar.png",
-                  )}
-                />
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-                  {(blog.user_id.profile?.display_name ?? "A")
-                    .charAt(0)
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-medium text-sm">
-                  {blog.user_id.profile?.display_name ?? "Anonymous"}
-                </p>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {new Date(blog.createdAt).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
+              <Link
+                href={`/pages/blog/profile-blog/${blog.user_id._id}`}
+                className="flex items-center gap-3 hover:opacity-80 transition"
+              >
+                <Avatar className="h-10 w-10">
+                  <AvatarImage
+                    src={getImageSrc(
+                      blog.user_id.profile?.avatar,
+                      "/default/avatar.png",
+                    )}
+                  />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                    {(blog.user_id.profile?.display_name ?? "A")
+                      .charAt(0)
+                      .toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium text-sm">
+                    {blog.user_id.profile?.display_name ?? "Anonymous"}
+                  </p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {new Date(blog.createdAt).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                </div>
+              </Link>
             </div>
             <div
               className="prose dark:prose-invert max-w-none prose-img:rounded-xl prose-img:shadow-lg prose-a:text-primary prose-headings:font-head ingprose-p:leading-8"
@@ -215,6 +223,7 @@ export default function Page() {
                 __html: blog.content,
               }}
             />
+            <p>test {JSON.stringify(blog.user_id._id)}</p>
             {blog.gallery && blog.gallery.length > 0 && (
               <motion.div
                 initial="hidden"

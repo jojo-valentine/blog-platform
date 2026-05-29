@@ -79,9 +79,19 @@ export default function LoginPage() {
         }
       });
     } catch (error: any) {
-      // console.error("Login error:", error);
-      // console.log(err);
+      const status = error.response?.status;
       const err = error.response?.data;
+
+      if (status === 403) {
+        Swal.fire({
+          icon: "warning",
+          title: "Account Suspended",
+          text: err?.message,
+        });
+
+        return;
+      }
+
       if (Array.isArray(err?.errors)) {
         const fieldErrors: Errors = {};
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 // import "./styles/globals.css";
 import { AuthProvider } from "@/app/context/AuthContext";
+import { ThemeProvider } from "@/app/components/ui/theme-provider";
 
 export const metadata: Metadata = {
   title: "BlogSpace",
@@ -19,7 +20,9 @@ export default function RootLayout({
         suppressHydrationWarning
         className="bg-background text-foreground font-sans"
       >
-        <AuthProvider>{children}</AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

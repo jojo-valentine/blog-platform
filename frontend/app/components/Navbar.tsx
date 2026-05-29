@@ -10,7 +10,15 @@ import {
 } from "@/app/components/ui/avatar";
 import { Button } from "./ui/button";
 import { useAuth } from "@/app/context/AuthContext";
-import { LogOut, User, PenSquare, BookOpen, Menu, X } from "lucide-react";
+import {
+  LogOut,
+  User,
+  PenSquare,
+  BookOpen,
+  Menu,
+  X,
+  UserStar,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,6 +83,7 @@ export default function Navbar() {
       </Button>
     </>
   );
+  const isAdmin = user?.roles?.includes("admin");
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
@@ -119,6 +128,15 @@ export default function Navbar() {
                   <User className="mr-2 h-4 w-4" /> Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                {isAdmin && (
+                  <>
+                    <DropdownMenuItem onClick={() => router.push("/admin/")}>
+                      <UserStar className="h-4 w-4" /> Admin
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
                 <DropdownMenuItem
                   onClick={handleSignOut}
                   className="text-destructive"
@@ -182,6 +200,15 @@ export default function Navbar() {
                   >
                     <User className="h-4 w-4" /> Profile
                   </Link>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="px-3 py-2 rounded-md hover:bg-muted text-sm transition-colors flex items-center gap-2"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <UserStar className="h-4 w-4" /> Admin
+                    </Link>
+                  )}
                   <button
                     onClick={handleSignOut}
                     className="px-3 py-2 rounded-md hover:bg-destructive/10 text-destructive text-sm text-left transition-colors flex items-center gap-2"

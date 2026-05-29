@@ -203,5 +203,10 @@ router.patch(
   useValidation({ body: adminSchemasUser.updateAdminUser }),
   AdminController.updateDataAdmin,
 );
-
+router.get(
+  "/dashboard/summary",
+  authMiddleware,
+  requireRole("admin"),
+  AdminController.getDashboardSummary,
+);
 export default router;

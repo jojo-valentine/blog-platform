@@ -196,6 +196,13 @@ class AuthController {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      if (user.suspended) {
+        return res.status(403).json({
+          message: "Your account has been suspended",
+        });
+      }
+
       // 🔥 ดึง role
       const hasRoles = await HasRole.find({ user_id: user._id })
         .populate<{
