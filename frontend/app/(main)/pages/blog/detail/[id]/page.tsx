@@ -223,7 +223,7 @@ export default function Page() {
                 __html: blog.content,
               }}
             />
-            <p>test {JSON.stringify(blog.user_id._id)}</p>
+
             {blog.gallery && blog.gallery.length > 0 && (
               <motion.div
                 initial="hidden"
