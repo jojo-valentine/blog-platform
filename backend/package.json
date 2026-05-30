@@ -7,7 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --exec ts-node server.ts",
     "seed": "ts-node seed/index.ts",
-    "clear": "rimraf .next && rimraf dist && rimraf node_modules/.cache && npm cache clean --force && npm run dev"
+    "clear": "rimraf .next && rimraf dist && rimraf node_modules/.cache && npm cache clean --force && npm run dev",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
   "keywords": [],
   "author": "",

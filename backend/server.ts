@@ -51,16 +51,6 @@ app.use(
 // ใช้ routes
 app.use("/api", apiRoutes);
 
-// เชื่อมต่อ DB ก่อนเปิด server
-connectDB().then(() => {
-  app.listen(port, () => {
-    console.log(`🚀 Server running on http://localhost:${port}`);
-  });
-});
-// 👉 บอก Express ว่า:
-// ถ้ามี request มา path ขึ้นต้นด้วย "/upload"
-// ให้ไปหาไฟล์จากโฟลเดอร์ "upload" ในเครื่อง (backend)
-
 app.use(
   "/upload", // 🔥 URL prefix (route ที่ client เรียก)
   express.static(
@@ -72,3 +62,13 @@ app.use(
 app.get("/", (req: Request, res: Response) => {
   res.json({ message: "Hello from Mongoose setup" });
 });
+
+// เชื่อมต่อ DB ก่อนเปิด server
+connectDB().then(() => {
+  app.listen(port, () => {
+    console.log(`🚀 Server running on http://localhost:${port}`);
+  });
+});
+// 👉 บอก Express ว่า:
+// ถ้ามี request มา path ขึ้นต้นด้วย "/upload"
+// ให้ไปหาไฟล์จากโฟลเดอร์ "upload" ในเครื่อง (backend)
