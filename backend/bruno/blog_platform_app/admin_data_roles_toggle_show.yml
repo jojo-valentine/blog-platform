@@ -1,0 +1,31 @@
+info:
+  name: admin_data_roles_toggle_show
+  type: http
+  seq: 34
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/roles/{{id}}/show"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  body:
+    type: json
+    data: |-
+      {
+        "show":"{{show}}"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: id
+      value: 6a1df05b7b97fd63907bd88f
+    - name: show
+      value: "false"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

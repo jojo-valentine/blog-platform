@@ -1,0 +1,29 @@
+info:
+  name: admin_category_create
+  type: http
+  seq: 26
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/list/categories/create"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  body:
+    type: json
+    data: |-
+      {
+        "name" : "{{name}}"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: name
+      value: ASMR
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

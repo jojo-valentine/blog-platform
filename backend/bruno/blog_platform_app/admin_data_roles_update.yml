@@ -1,0 +1,36 @@
+info:
+  name: admin_data_roles_update
+  type: http
+  seq: 32
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/roles/{{editId}}/update"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  body:
+    type: json
+    data: |-
+      {
+        "name": "{{name}}",
+          "permissions": ["{{perm1}}", "{{perm2}}"]
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: editId
+      value: 6a1df05b7b97fd63907bd88f
+    - name: name
+      value: testRol2
+    - name: perm1
+      value: create_user
+    - name: perm2
+      value: suspend_user
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

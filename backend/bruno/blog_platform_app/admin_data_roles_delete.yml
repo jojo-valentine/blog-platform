@@ -1,0 +1,23 @@
+info:
+  name: admin_data_roles_delete
+  type: http
+  seq: 33
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/roles/{{id}}/delete"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  auth: inherit
+
+runtime:
+  variables:
+    - name: id
+      value: 6a1df05b7b97fd63907bd88f
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

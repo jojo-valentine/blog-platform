@@ -1,0 +1,34 @@
+info:
+  name: admin_data_roles_create
+  type: http
+  seq: 31
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/roles/"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  body:
+    type: json
+    data: |-
+      {
+        "name": "{{name}}",
+          "permissions": ["{{perm1}}", "{{perm2}}"]
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: name
+      value: testRol3
+    - name: perm1
+      value: create_user
+    - name: perm2
+      value: suspend_user
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

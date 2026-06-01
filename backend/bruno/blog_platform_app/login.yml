@@ -19,14 +19,14 @@ runtime:
   variables:
     - name: email
       value: jojotest731@gmail.com
+      disabled: true
     - name: password
       value: pass@P123
+      disabled: true
     - name: email
       value: alice@example.com
-      disabled: true
     - name: password
       value: password@P123
-      disabled: true
   scripts:
     - type: after-response
       code: |-

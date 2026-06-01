@@ -65,7 +65,7 @@ router.delete(
   AdminController.deleteCategory,
 ); // soft delete
 router.delete(
-  "/:id/destroy",
+  "/list/categories/:id/destroy",
   authMiddleware,
   requireRole("admin"),
   AdminController.destroyCategory,

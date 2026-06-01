@@ -566,6 +566,7 @@ class AdminController {
   }
   static async toggleRole(req: Request, res: Response) {
     const id = req.params.id;
+    console.log("toggleRole called");
 
     const session = await startSession();
 
@@ -574,8 +575,8 @@ class AdminController {
 
       await session.withTransaction(async () => {
         const { show } = req.body;
-        const result = await Role.findById(id).session(session);
 
+        const result = await Role.findById(id).session(session);
         if (!result) {
           throw {
             field: "other",
