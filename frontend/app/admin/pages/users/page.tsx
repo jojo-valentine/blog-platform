@@ -968,11 +968,11 @@ export default function PageUser() {
                 {/* Header */}
                 <div className="flex flex-col gap-1">
                   <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                    Roles
+                    Users
                   </h2>
 
                   <p className="text-sm text-muted-foreground">
-                    Manage roles and permissions
+                    Manage Users
                   </p>
                 </div>
 

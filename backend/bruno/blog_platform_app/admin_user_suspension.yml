@@ -1,0 +1,34 @@
+info:
+  name: admin_user_suspension
+  type: http
+  seq: 43
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/users/{{id}}/suspension"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+    - name: Content-Type
+      value: multipart/form-data
+      disabled: true
+  body:
+    type: json
+    data: |-
+      {
+        "suspended": "{{suspended}}"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: suspended
+      value: "true"
+    - name: id
+      value: 6a1f2d2f62b69b02b2b2ca60
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

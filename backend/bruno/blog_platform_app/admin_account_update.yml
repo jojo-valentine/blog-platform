@@ -1,0 +1,57 @@
+info:
+  name: admin_account_update
+  type: http
+  seq: 46
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/user/{{id}}/account"
+  headers:
+    - name: Cookie
+      value: refreshToken={{jwt_token}}
+    - name: Content-Type
+      value: multipart/form-data
+  body:
+    type: multipart-form
+    data:
+      - name: avatar
+        type: file
+        value:
+          - C:\Users\UsEr\Downloads\HJwzkinbUAADDk8.jpg
+      - name: name
+        type: text
+        value: "{{name}}"
+      - name: email
+        type: text
+        value: "{{email}}"
+      - name: mobile
+        type: text
+        value: "{{mobile}}"
+      - name: display_name
+        type: text
+        value: "{{display_name}}"
+      - name: age
+        type: text
+        value: "{{age}}"
+  auth: inherit
+
+runtime:
+  variables:
+    - name: id
+      value: 69cc007974d3aa5ce0ef14c2
+    - name: name
+      value: ง่วง
+    - name: email
+      value: jojotest731@gmail.com
+    - name: mobile
+      value: "0999999991"
+    - name: display_name
+      value: ง่วงนอน
+    - name: age
+      value: "15"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

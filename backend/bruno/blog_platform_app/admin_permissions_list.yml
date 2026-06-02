@@ -1,0 +1,41 @@
+info:
+  name: admin_permissions_list
+  type: http
+  seq: 35
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/permissions?search={{search}}&page={{page}}&category=[{{category}}, {{category2}}]"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  params:
+    - name: search
+      value: "{{search}}"
+      type: query
+    - name: page
+      value: "{{page}}"
+      type: query
+    - name: category
+      value: "[{{category}}, {{category2}}]"
+      type: query
+  auth: inherit
+
+runtime:
+  variables:
+    - name: page
+      value: "1"
+    - name: search
+      value: ""
+    - name: category
+      value: bloger
+      disabled: true
+    - name: category2
+      value: test
+      disabled: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

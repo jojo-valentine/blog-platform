@@ -1,0 +1,66 @@
+info:
+  name: admin_user_update
+  type: http
+  seq: 41
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/users/{{id}}"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+    - name: Content-Type
+      value: multipart/form-data
+      disabled: true
+  body:
+    type: json
+    data: |-
+      {
+        "name": "{{name}}",
+        "email": "{{email}}",
+        "mobile": "{{mobile}}",
+        "profile": {
+          "display_name": "{{display_name}}",
+          "age": {{age}},
+          "social_links": [
+            {{link1}}
+          ]
+        }
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: link1
+      value: '{"platform": "facebook", "url": "https://facebook.com/test"}'
+    - name: link2
+      value: '{"platform": "youtube", "url": "https://www.youtube.com/watch?v=Cm3GK5Hudgc"}'
+      disabled: true
+    - name: link3
+      value: '{"platform": "facebook", "url": "https://facebook.com/test"}'
+      disabled: true
+    - name: link4
+      value: '{"platform": "instagram", "url": "https://www.instagram.com/cos_takane_21/"}'
+      disabled: true
+    - name: name
+      value: Sleepy123
+    - name: email
+      value: sleepy123@gmail.com
+    - name: mobile
+      value: "0245332345"
+    - name: password
+      value: password@P123
+    - name: confirm_password
+      value: password@P123
+    - name: display_name
+      value: Sleepy123
+    - name: age
+      value: "12"
+    - name: id
+      value: 6a1f2d2f62b69b02b2b2ca60
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,15 @@
+info:
+  name: dashboard/summary
+  type: http
+  seq: 47
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/dashboard/summary"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -566,8 +566,6 @@ class AdminController {
   }
   static async toggleRole(req: Request, res: Response) {
     const id = req.params.id;
-    console.log("toggleRole called");
-
     const session = await startSession();
 
     try {
@@ -933,6 +931,7 @@ class AdminController {
     const userId = Array.isArray(req.params.id)
       ? req.params.id[0]
       : req.params.id;
+
     const session = await mongoose.startSession();
     const errors: { field: string; message: string }[] = [];
     // ✅ validate user id

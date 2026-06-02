@@ -1,0 +1,32 @@
+info:
+  name: admin_user_update_avatar
+  type: http
+  seq: 41
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/users/{{id}}/suspension"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+    - name: Content-Type
+      value: multipart/form-data
+  body:
+    type: multipart-form
+    data:
+      - name: avatar
+        type: file
+        value:
+          - C:\Users\UsEr\Downloads\HJz6gkZbcAAp5dL.jpg
+  auth: inherit
+
+runtime:
+  variables:
+    - name: id
+      value: 6a1f2d2f62b69b02b2b2ca60
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

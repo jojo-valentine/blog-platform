@@ -1,0 +1,75 @@
+info:
+  name: admin_user_create
+  type: http
+  seq: 41
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/users/{{id}}"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+    - name: Content-Type
+      value: multipart/form-data
+  body:
+    type: multipart-form
+    data:
+      - name: name
+        type: text
+        value: "{{name}}"
+      - name: email
+        type: text
+        value: "{{email}}"
+      - name: mobile
+        type: text
+        value: "{{mobile}}"
+      - name: password
+        type: text
+        value: "{{password}}"
+      - name: confirm_password
+        type: text
+        value: "{{confirm_password}}"
+      - name: display_name
+        type: text
+        value: "{{display_name}}"
+      - name: age
+        type: text
+        value: "{{age}}"
+      - name: social_links
+        type: text
+        value: "[{{link1}} , {{link2}},{{link3}},{{link4}}]"
+      - name: avatar
+        type: text
+        value: ""
+  auth: inherit
+
+runtime:
+  variables:
+    - name: link1
+      value: '{"platform": "facebook", "url": "https://facebook.com/test"}'
+    - name: link2
+      value: '{"platform": "youtube", "url": "https://www.youtube.com/watch?v=Cm3GK5Hudgc"}'
+    - name: link3
+      value: '{"platform": "facebook", "url": "https://facebook.com/test"}'
+    - name: link4
+      value: '{"platform": "instagram", "url": "https://www.instagram.com/cos_takane_21/"}'
+    - name: name
+      value: Sleepy123
+    - name: email
+      value: sleepy123@gmail.com
+    - name: mobile
+      value: "0245332345"
+    - name: password
+      value: password@P123
+    - name: confirm_password
+      value: password@P123
+    - name: display_name
+      value: Sleepy123
+    - name: age
+      value: "12"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

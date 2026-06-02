@@ -1,0 +1,32 @@
+info:
+  name: admin_user_lists
+  type: http
+  seq: 38
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/users?search={{search}}&page={{page}}"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  params:
+    - name: search
+      value: "{{search}}"
+      type: query
+    - name: page
+      value: "{{page}}"
+      type: query
+  auth: inherit
+
+runtime:
+  variables:
+    - name: search
+      value: ""
+    - name: page
+      value: "1"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

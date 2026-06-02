@@ -188,7 +188,6 @@ router.patch(
   useValidation({ body: adminSchemasUser.changPassword }),
   AdminController.changePasswordUser,
 );
-
 router.get(
   "/user/account",
   authMiddleware,

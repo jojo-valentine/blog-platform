@@ -1,0 +1,33 @@
+info:
+  name: admin_permissions_update
+  type: http
+  seq: 37
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/permissions/{{id}}"
+  headers:
+    - name: Cookie
+      value: accessToken={{jwt_token}}
+  body:
+    type: json
+    data: |
+      {
+        "roles": ["{{role_id}}", "{{role_id2}}"]
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: id
+      value: 69c6c09b4ed2731c9f07d8c0
+    - name: role_id
+      value: 69bd771de8aa12a1c55413aa
+    - name: role_id2
+      value: 69bd771de8aa12a1c55413ab
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
