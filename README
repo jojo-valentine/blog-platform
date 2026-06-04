@@ -1,0 +1,170 @@
+# Blog Platform
+
+A full-stack blog management platform built with Next.js, Express.js, TypeScript, and MongoDB.
+
+## Features
+
+### Authentication
+- Register
+- Login
+- Logout
+- JWT Authentication
+- Cookie-based Session
+- OTP Email Verification
+- Password Reset
+
+### User Management
+- User Profile
+- Avatar Upload
+- Role Management
+- Permission-based Access Control
+- Suspend / Restore User
+
+### Blog Management
+- Create Blog
+- Update Blog
+- Delete Blog
+- Blog Categories
+- Blog Search & Filtering
+- Blog Cover Image Upload
+- Blog Gallery Upload
+
+### Admin Dashboard
+- User Management
+- Role Management
+- Category Management
+- Blog Moderation
+
+---
+### Frontend
+
+- Next.js
+- TypeScript
+- Tailwind CSS
+- Axios
+- React Hook Form
+- Zod
+
+### Backend
+
+- Express.js
+- TypeScript
+- MongoDB
+- Mongoose
+- JWT
+- Multer
+- Sharp
+- Nodemailer
+
+---
+
+## Project Structure
+
+```bash
+blog-platform/
+├── frontend/
+├── backend/
+├── backend/bruno/
+└── README.md
+```
+
+---
+
+## Screenshots
+
+### Login Page
+
+![Login](docs/screenshots/login.png)
+
+### Blog List
+
+![Blog List](docs/screenshots/blog-list.png)
+
+### Admin Dashboard
+
+![Admin Dashboard](docs/screenshots/admin-dashboard.png)
+
+---
+
+## API Testing
+
+This project includes a Bruno Collection.
+
+```bash
+/bruno
+```
+
+Available environments:
+
+- Local
+- Production
+
+---
+## Installation
+
+### Clone Repository
+
+```bash
+git clone https://github.com/jojo-valentine/blog-platform.git
+cd blog-platform
+```
+
+### Backend
+
+```bash
+cd backend
+
+npm install
+
+npm run dev
+```
+
+### Frontend
+
+```bash
+cd frontend
+
+npm install
+
+npm run dev
+```
+
+---
+
+## Environment Variables
+
+### Backend
+
+```env
+NODE_ENV=development
+
+MONGO_URI_DEV=
+
+JWT_SECRET=
+
+CLIENT_URL=
+
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+```
+
+---
+
+## Live Demo
+
+### Frontend
+
+Coming Soon
+
+### Backend
+
+https://your-render-url.onrender.com
+
+---
+
+## Author
+
+GitHub:
+https://github.com/jojo-valentine
